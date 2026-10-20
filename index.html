@@ -516,7 +516,30 @@ button:active { transform: scale(0.97); }
     rank: (r) => (r ? "https://cdn.brawlify.com/ranked/tiered/" + (58000000 + r - 1) + ".png" : null),
     icon: (id) => (id ? "https://cdn.brawlify.com/profile-icons/regular/" + id + ".png" : null),
   };
-  const art = (src) => (src ? '<img class="art" src="' + esc(src) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : "");
+  // Pictures that have loaded once are kept ready in memory. When a screen is drawn again (switching tabs,
+  // refreshing), those are shown straight away instead of waiting a frame for lazy loading and decoding,
+  // which made them blink. Pictures not loaded yet still load lazily.
+  const ART_OK = new Map();
+  const keepArt = (src) => { if (!src || ART_OK.has(src)) return; const im = new Image(); im.src = src; ART_OK.set(src, im); };
+  window.__artOk = (img) => keepArt(img.getAttribute("src"));
+  const art = (src) => (src ? '<img class="art" src="' + esc(src) + '" alt=""' + (ART_OK.has(src) ? ' decoding="sync"' : ' loading="lazy" decoding="async" onload="__artOk(this)"') + ' onerror="this.remove()">' : "");
+  // After the first screen is up, quietly fetch the pictures the other tabs use, so they open fully drawn.
+  function warmArt() {
+    const html = [];
+    for (const t of Object.keys(RENDER)) if (t !== S.tab) { try { html.push(RENDER[t]()); } catch (e) {} }
+    charts.length = 0;
+    const re = /<img class="art" src="([^"]+)"/g, todo = [];
+    for (const h of html) for (let m; (m = re.exec(h)); ) { const s = m[1].replace(/&amp;/g, "&"); if (!ART_OK.has(s) && !todo.includes(s)) todo.push(s); }
+    let i = 0;
+    const next = () => {
+      if (i >= todo.length) return;
+      const src = todo[i++], im = new Image();
+      im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { ART_OK.set(src, im); next(); }); };
+      im.onerror = next;
+      im.src = src;
+    };
+    for (let k = 0; k < 6; k++) next();
+  }
   const initials = (name) => { const w = String(name).replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/); return ((w[0] || "?")[0] + (w[1] ? w[1][0] : (w[0] || "")[1] || "")).toUpperCase(); };
   const outcome = (b) => {
     if (/draw/i.test(b.r || "")) return "d";
@@ -1518,6 +1541,7 @@ button:active { transform: scale(0.97); }
     flushCharts();
     S.drawAnim = false;
     countUps(sec);
+    if (render.warmVer !== S.ver) { render.warmVer = S.ver; setTimeout(warmArt, 1500); }
     for (const b of document.querySelectorAll(".tabbar button")) { if (b.dataset.go === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
     if (active === "brSearch") { const el = $("#brSearch"); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) {} } }
   }

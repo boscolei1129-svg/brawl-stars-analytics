@@ -1,7 +1,11 @@
 // Opens the app instantly: the page, fonts and icons come from this device first and are refreshed
-// in the background, so a new version shows up on the next open. Stats requests to Supabase are never
-// touched here (they're on another site); the page keeps its own saved copy of those.
+// in the background, so a new version shows up on the next open. Game pictures (brawlers, profile icons,
+// modes, maps) are kept on the device after their first download. Stats requests to Supabase are never
+// touched here; the page keeps its own saved copy of those.
 const CACHE = "brawl-stats-v1";
+const ART_CACHE = "brawl-art-v1";
+const ART_HOSTS = ["cdn.brawlify.com", "media.brawltime.ninja"];
+const ART_MAX = 800;
 const SHELL = ["./", "manifest.webmanifest", "icon-192.png", "favicon-32.png",
   "fonts/chakra-petch-latin-500-normal.woff2", "fonts/chakra-petch-latin-600-normal.woff2", "fonts/chakra-petch-latin-700-normal.woff2",
   "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2"];
@@ -13,14 +17,31 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
-    for (const key of await caches.keys()) if (key !== CACHE) await caches.delete(key);
+    for (const key of await caches.keys()) if (key !== CACHE && key !== ART_CACHE) await caches.delete(key);
     await self.clients.claim();
   })());
 });
 
+// Game pictures don't change, so a saved copy is used without asking the network again.
+async function artResponse(event) {
+  const req = event.request;
+  const cache = await caches.open(ART_CACHE);
+  const hit = await cache.match(req.url);
+  if (hit) return hit;
+  let res;
+  try { res = await fetch(req.url, { mode: "cors", credentials: "omit" }); } catch (e) { return fetch(req); }
+  if (res.ok) event.waitUntil(cache.put(req.url, res.clone()).then(() => trimArt(cache)).catch(() => {}));
+  return res;
+}
+async function trimArt(cache) {
+  const keys = await cache.keys();
+  for (let i = 0; i < keys.length - ART_MAX; i++) await cache.delete(keys[i]);
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
+  if (req.method === "GET" && ART_HOSTS.includes(url.hostname)) { event.respondWith(artResponse(event)); return; }
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
   // Every visit to the app (with or without ?query) uses the one saved copy of the page.
   const key = req.mode === "navigate" ? new URL("./", self.registration.scope).href : url.origin + url.pathname;

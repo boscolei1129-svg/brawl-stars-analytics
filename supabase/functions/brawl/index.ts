@@ -673,6 +673,10 @@ function ipOf(req: Request) {
   const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   return xff[0] ?? req.headers.get("x-real-ip") ?? "unknown";
 }
+// Counters are keyed by a scrambled form of the address (salted with a server secret), never the address itself.
+async function ipKey(req: Request) {
+  return (await sha256("ip:" + Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") + ":" + ipOf(req))).slice(0, 24);
+}
 // True while `key` has been used at most `max` times in the current `windowS`-second window. If the counter
 // itself fails, the request goes through: a broken limit shouldn't take the app down.
 async function allow(key: string, windowS: number, max: number) {
@@ -774,7 +778,7 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body */ }
   const tag = body.tag == null || body.tag === "" ? LEGACY : normTag(body.tag);
-  const ip = ipOf(req);
+  const ip = await ipKey(req);
   try {
     switch (body.action) {
       case "profile_lookup": {

@@ -1501,7 +1501,7 @@ button:active { transform: scale(0.97); }
       if (done) eta = "Reached";
       else if (!r) eta = "ETA after a few more readings";
       else if (r.rate <= 0) eta = "Not climbing right now";
-      else { const days = (g.target - cur) / r.rate; eta = days > 3650 ? "Over 10 years at this pace" : "ETA " + new Date(Date.now() + days * DAY).toLocaleDateString("en-US", { month: "short", day: "numeric", year: days > 300 ? "numeric" : undefined }) + " · " + (days < 1 ? "under a day" : Math.round(days) + " days"); }
+      else { const days = (g.target - cur) / r.rate; eta = days > 3650 ? "Over 10 years at this pace" : "ETA " + new Date(Date.now() + days * DAY).toLocaleDateString("en-US", { month: "short", day: "numeric", year: days > 300 ? "numeric" : undefined }) + " · " + (days < 1 ? "under a day" : Math.round(days) + " days") + " at your 7-day pace"; }
       const meter = g.kind === "club" ? "teal" : g.kind === "elo" ? "" : "hot";
       const confirming = S.confirmDel === g.id;
       return '<div class="card goal"><div class="gt"><h3>' + esc(goalTitle(g)) + '</h3><span class="chip ' + (done ? "up" : "hot") + '">' + Math.floor(pct) + "%</span></div>" +
@@ -1963,6 +1963,7 @@ button:active { transform: scale(0.97); }
       sec("What\'s stored", [
         "<b>For each tracked player:</b> their public game stats (tag, name, trophies, brawlers, battles and club). Anyone using the app can see them, as in the game.",
         "<b>For this phone:</b> a random key made on this phone, your goals, your alert settings and the address your browser uses for notifications. Only this phone, and phones you link, can see or change them.",
+        "To stop abuse, the server counts requests from each network address. The counts are scrambled and deleted within two days.",
         "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this phone."]) +
       sec("Keeping and removing", [
         "Removing a player only takes it off this phone. Players nobody opens for 30 days stop being checked.",

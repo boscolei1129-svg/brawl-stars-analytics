@@ -193,7 +193,8 @@ alter table public.device_links enable row level security;
 alter table public.goals add column owner uuid;     -- null = made with an old per-player code, not yet handed in
 create index goals_owner_tag_idx on public.goals (owner, tag);
 alter table public.push_subs add column owner uuid;  -- goal alerts only go to the goal owner's phones
-drop policy "Anyone can read goals" on public.goals; -- goals are private now; the function serves each phone its own
+alter policy "Anyone can read goals" on public.goals using (false);  -- goals are private now; the function serves each phone its own
+alter policy "Anyone can read goals" on public.goals rename to "Goals are private (served by the function)";
 
 -- Call counters for the function's abuse limits (cleared after two days by the function itself).
 create table public.rate_hits (

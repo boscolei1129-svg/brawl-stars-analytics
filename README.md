@@ -16,7 +16,7 @@ A stats tracker for Brawl Stars players and their clubs. It shows trophy growth,
 - **Notifications.** On the Goals tab, each device can turn on alerts for that player: goals reached, trophy milestones (every 500 for you, every 5,000 for the club), members joining or leaving, and a daily recap at a time it picks (in the phone's own time zone). The recap covers the last 24 hours: your battles, trophies and win rate, plus the trophies the other members won for the club while in it, so new members joining (and your own trophies) don't count. On iPhone and iPad this works once the app is added to the Home Screen and opened from there. The server signs notifications with its own keys (made on first use, kept private in the database).
 - **Opening fast.** The page, fonts, icons and game pictures stay on your device (`sw.js`), and so do the stats it has already downloaded. Pictures for the other tabs are fetched in the background after the app opens, so every tab shows up fully drawn. The app opens instantly and then fetches only what's new. An update to the site shows up the second time you open it.
 - **Lean storage.** When a check finds nothing new, the server marks the last reading as confirmed instead of saving a copy. Brawler lists are saved as changes only.
-- **Abuse limits.** The server counts calls per address (Supabase's gateway sets the caller's address; it can't be faked) for player lookups (40 per 10 minutes), adding new players (6 per hour), new devices, link codes, notifications and the old code check (10 tries per player per hour). Over the limit, the app says to wait a few minutes.
+- **Abuse limits.** The server counts calls per address (Supabase's gateway sets the caller's address, so it can't be faked; counters store only a salted hash of it and are deleted after two days) for player lookups (40 per 10 minutes), adding new players (6 per hour), new devices, link codes, notifications and the old code check (10 tries per player per hour). Over the limit, the app says to wait a few minutes.
 - **The database** (`supabase/schema.sql`) has these tables:
   - `profiles`: every tracked player and the club it follows.
   - `readings`: one row per update, per player.
@@ -48,3 +48,7 @@ The app has no accounts and collects no names, emails, locations, ads or analyti
 - Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`). The welcome "hello" is traced from the letterforms of Dancing Script (SIL Open Font License).
 - Game art is loaded from Brawlify and BrawlTime. This app is unofficial and not affiliated with, endorsed, sponsored or approved by Supercell; see Supercell's Fan Content Policy.
 - Club activity is an estimate: the game doesn't share who is online, so the app shows members as **recently active** when one of their battles ended in the last 12 minutes, never as "online".
+
+## Tests
+
+`tests/fn_security.js` runs the real server function in Node against an in-memory database and checks that one phone can't see, change or delete another phone's goals, that link codes work once and expire, that guesses and expensive calls are limited, and that goal alerts only reach the goal's owner: `npm i esbuild && node tests/fn_security.js supabase/functions/brawl/index.ts`.

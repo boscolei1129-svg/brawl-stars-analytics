@@ -76,16 +76,18 @@ create table public.push_subs (
   endpoint text primary key,
   p256dh text not null,
   auth text not null,
+  -- also recap_at ("HH:MM", the device's chosen daily recap time) and tz (the device's time zone)
   prefs jsonb not null default '{"goals": true, "milestones": true, "roster": true, "recap": true}'::jsonb,
   created_at timestamptz not null default now(),
-  last_sent_at timestamptz
+  last_sent_at timestamptz,
+  last_recap text  -- local date of the last daily recap this device got
 );
 alter table public.push_subs enable row level security;
 
--- Nightly recap notification at 10 PM Shanghai time (14:00 UTC).
+-- Daily recap: every 5 minutes, send it to devices whose chosen time has just passed.
 select cron.schedule(
   'brawl-recap',
-  '0 14 * * *',
+  '*/5 * * * *',
   $$ select net.http_post(
        url := 'https://iuukdskmzjglpvtlwldw.supabase.co/functions/v1/brawl',
        body := '{"action":"recap"}'::jsonb,

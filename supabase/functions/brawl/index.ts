@@ -6,14 +6,15 @@
 //   POST {action:"push_key"}                       public key for turning on notifications
 //   POST {action:"push_subscribe", code, sub, prefs?} / {action:"push_prefs", code, endpoint, prefs}
 //   POST {action:"push_unsubscribe", endpoint} / {action:"push_test", code, endpoint}
-//   POST {action:"recap"}                          nightly summary notification (run by the schedule)
+//   POST {action:"recap"}                          daily summary for devices whose chosen time just passed (run by the schedule every 5 minutes)
+//   POST {action:"recap_preview"}                  the daily summary text, without sending it
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 const ME = "8YRJ090Q2";
 const CLUB = "2U0RP22G2";
 const MIN_GAP_MS = 60_000; // refreshes closer together than this reuse the last reading
-const TZ = "Asia/Shanghai"; // "today" for the nightly recap
+const TZ = "Asia/Shanghai"; // time zone for a device that didn't send its own
 const STEP_ME = 500, STEP_CLUB = 5000; // milestone sizes for notifications
 const GAP_MS = 20 * 60_000; // battles closer together than this are one play session
 const BATTLE_MS = 3 * 60_000; // a session starts about one battle before its first battle ends
@@ -476,39 +477,126 @@ async function checkEvents(cur: { trophies: number | null; club: number | null; 
   return sent;
 }
 
-// Nightly summary of today's battles and club change, in the TZ time zone.
-async function recap() {
-  const now = new Date();
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-    .formatToParts(now).map((x) => [x.type, x.value]));
-  const today = `${p.year}-${p.month}-${p.day}`;
-  const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(now.getTime() / 60000) * 60000;
-  const midnight = new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - offset).toISOString();
-  const st = JSON.parse((await getSetting("notify_state")) ?? "{}");
-  if (st.recap === today) return { ok: true, skipped: "already sent today" };
-  const { data: bs, error } = await sb.from("battles").select("win, tc").gte("t", midnight);
+// ---------- daily recap ----------
+// Each device picks its own time and sends its own time zone. The schedule calls recap() every 5 minutes;
+// a device is due when its time passed within the last 30 minutes and it hasn't had that day's recap.
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+function zoneOk(tz: unknown) {
+  if (typeof tz !== "string" || !tz || tz.length > 64) return false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; }
+}
+function localParts(t: number, tz: string) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, min: (+p.hour % 24) * 60 + +p.minute };
+}
+const RECAP_WINDOW_MIN = 30;
+// The local date whose recap this device should get now, or null.
+function recapDue(sub: any, now: number): string | null {
+  if (sub.prefs?.recap === false) return null;
+  const at = HHMM.test(String(sub.prefs?.recap_at ?? "")) ? String(sub.prefs.recap_at) : "22:00";
+  const tz = zoneOk(sub.prefs?.tz) ? sub.prefs.tz : TZ;
+  const want = +at.slice(0, 2) * 60 + +at.slice(3);
+  const t = localParts(now, tz);
+  if (t.min >= want) return t.min - want <= RECAP_WINDOW_MIN && sub.last_recap !== t.date ? t.date : null;
+  // Just after midnight, a recap set for late last night may still be owed.
+  const y = localParts(now - (t.min + 1) * 60_000, tz).date;
+  return t.min + 1440 - want <= RECAP_WINDOW_MIN && sub.last_recap !== y ? y : null;
+}
+
+// Reads every row of a query, 1,000 at a time (the database hands out at most that many per request).
+async function readAll(make: () => any) {
+  const out: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await make().range(from, from + 999);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+// Trophies the club's members won or lost since `from`, counted only while they were in the club:
+// members joining or leaving don't count, and neither do you. Walks the saved club lists in order.
+async function clubGrowth(from: number) {
+  const fromIso = new Date(from).toISOString();
+  const { data: base, error } = await sb.from("readings").select("ts, club").not("club", "is", null)
+    .lte("ts", fromIso).order("ts", { ascending: false }).order("id", { ascending: false }).limit(1);
+  if (error) throw error;
+  const rows = await readAll(() => {
+    let q = sb.from("readings").select("ts, club, club_upd").or("club.not.is.null,club_upd.not.is.null");
+    if (base?.length) q = q.gt("ts", base[0].ts);
+    return q.order("ts", { ascending: true }).order("id", { ascending: true });
+  });
+  let state: any = base?.[0]?.club ?? null;
+  const per = new Map<string, { name: string; gain: number }>();
+  let total = 0;
+  for (const r of rows) {
+    const next = applyClub(state, r.club ?? r.club_upd);
+    if (!next?.members) continue;
+    if (state?.members && ms(r.ts) > from) {
+      const before = new Map(state.members.map((m: any[]) => [m[0], m[3]]));
+      for (const m of next.members) {
+        const was = before.get(m[0]);
+        if (m[0] === ME || typeof was !== "number" || typeof m[3] !== "number" || m[3] === was) continue;
+        total += m[3] - was;
+        const e = per.get(m[0]) ?? { name: m[1], gain: 0 };
+        e.gain += m[3] - was; e.name = m[1];
+        per.set(m[0], e);
+      }
+    }
+    state = next;
+  }
+  const top = [...per.values()].sort((a, b) => b.gain - a.gain)[0];
+  return { total, top: top && top.gain > 0 ? top : null };
+}
+
+// What the recap says: the last 24 hours of your battles, and what other members added to the club.
+async function recapData(now: number) {
+  const since = now - 24 * 3600_000;
+  const { data: bs, error } = await sb.from("battles").select("win, tc").gte("t", new Date(since).toISOString());
   if (error) throw error;
   const n = bs?.length ?? 0, w = (bs ?? []).filter((b: any) => b.win === true).length, l = (bs ?? []).filter((b: any) => b.win === false).length;
   const net = (bs ?? []).reduce((a: number, b: any) => a + (b.tc ?? 0), 0);
-  const at = async (col: string, before: boolean) => {
-    let q = sb.from("readings").select(col).not(col, "is", null);
-    q = before ? q.lte("ts", midnight).order("ts", { ascending: false }) : q.order("ts", { ascending: false });
-    const { data } = await q.limit(1);
-    return (data?.[0] as any)?.[col] ?? null;
-  };
-  const [club0, club1, me1] = await Promise.all([at("club_trophies", true), at("club_trophies", false), at("trophies", false)]);
-  const clubDelta = club0 != null && club1 != null ? club1 - club0 : 0;
-  st.recap = today;
-  await setSetting("notify_state", st);
-  if (!n && !clubDelta) return { ok: true, skipped: "nothing happened today" };
-  const body = (n ? n + (n === 1 ? " battle" : " battles") + " · " + sgnN(net) + " trophies" + (w + l ? " · " + Math.round((w / (w + l)) * 100) + "% wins" : "") : "No battles today")
-    + (me1 != null ? " · now " + fmtN(me1) : "") + (clubDelta ? ". Club " + sgnN(clubDelta) + " today." : ".");
-  const sent = await notify("recap", { title: "🌙 Today in Brawl Stars", body, tag: "recap", url: "./#me" });
-  return { ok: true, sent };
+  const { data: pr } = await sb.from("readings").select("trophies").not("trophies", "is", null).order("ts", { ascending: false }).limit(1);
+  return { n, w, l, net, me: pr?.[0]?.trophies ?? null, club: await clubGrowth(since) };
+}
+function recapBody(d: Awaited<ReturnType<typeof recapData>>) {
+  const you = d.n
+    ? "You: " + d.n + (d.n === 1 ? " battle, " : " battles, ") + sgnN(d.net) + " trophies" + (d.w + d.l ? ", " + Math.round((d.w / (d.w + d.l)) * 100) + "% wins" : "") + "."
+    : "You: no battles.";
+  const club = d.club.total
+    ? "Club: " + sgnN(d.club.total) + " from other members' battles" + (d.club.top ? ". Top: " + d.club.top.name + " " + sgnN(d.club.top.gain) : "") + "."
+    : "Club: no change from other members.";
+  return you + (d.me != null ? " Now " + fmtN(d.me) + "." : "") + "\n" + club;
+}
+async function recap() {
+  const now = Date.now();
+  const { data: subs, error } = await sb.from("push_subs").select("*");
+  if (error) throw error;
+  const due = (subs ?? []).map((s: any) => ({ s, day: recapDue(s, now) })).filter((x) => x.day);
+  if (!due.length) return { ok: true, due: 0 };
+  // Freshen the stats first so the recap is current.
+  try { await refresh("auto"); } catch (e) { console.error("recap refresh failed", String(e)); }
+  const d = await recapData(Date.now());
+  const body = recapBody(d);
+  let sent = 0;
+  for (const { s, day } of due) {
+    await sb.from("push_subs").update({ last_recap: day }).eq("endpoint", s.endpoint);
+    if (d.n || d.club.total) sent += await pushTo([s], { title: "📊 Daily recap", body, tag: "recap", url: "./#me" });
+  }
+  return { ok: true, due: due.length, sent, body };
 }
 
+// When a device saves its settings, a recap time that has only just passed counts as done for today,
+// so the next recap comes the next time that time comes round (what the app shows), not straight away.
+const recapMark = (prefs: any, now: number) => recapDue({ prefs, last_recap: null }, now);
+
 const PREF_KEYS = ["goals", "milestones", "roster", "recap"];
-const cleanPrefs = (p: any) => Object.fromEntries(PREF_KEYS.map((k) => [k, p?.[k] !== false]));
+const cleanPrefs = (p: any) => ({
+  ...Object.fromEntries(PREF_KEYS.map((k) => [k, p?.[k] !== false])),
+  recap_at: HHMM.test(String(p?.recap_at ?? "")) ? String(p.recap_at) : "22:00",
+  tz: zoneOk(p?.tz) ? String(p.tz) : TZ,
+});
 function cleanSub(sub: any) {
   const endpoint = String(sub?.endpoint ?? ""), p256dh = String(sub?.keys?.p256dh ?? ""), auth = String(sub?.keys?.auth ?? "");
   if (!/^https:\/\//.test(endpoint) || !p256dh || !auth || endpoint.length > 1000) return null;
@@ -579,13 +667,15 @@ Deno.serve(async (req) => {
         if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
         const sub = cleanSub(body.sub);
         if (!sub) return json({ ok: false, error: "bad_subscription" }, 400);
-        const { error } = await sb.from("push_subs").upsert({ ...sub, prefs: cleanPrefs(body.prefs) });
+        const prefs = cleanPrefs(body.prefs);
+        const { error } = await sb.from("push_subs").upsert({ ...sub, prefs, last_recap: recapMark(prefs, Date.now()) });
         if (error) throw error;
         return json({ ok: true });
       }
       case "push_prefs": {
         if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
-        const { error } = await sb.from("push_subs").update({ prefs: cleanPrefs(body.prefs) }).eq("endpoint", String(body.endpoint ?? ""));
+        const prefs = cleanPrefs(body.prefs);
+        const { error } = await sb.from("push_subs").update({ prefs, last_recap: recapMark(prefs, Date.now()) }).eq("endpoint", String(body.endpoint ?? ""));
         if (error) throw error;
         return json({ ok: true });
       }
@@ -598,7 +688,7 @@ Deno.serve(async (req) => {
         if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
         const { data } = await sb.from("push_subs").select("*").eq("endpoint", String(body.endpoint ?? ""));
         if (!data?.length) return json({ ok: false, error: "not_subscribed" }, 404);
-        const sent = await pushTo(data, { title: "✅ Notifications are on", body: "You'll hear about goals, milestones, club changes and get a nightly recap.", tag: "test", url: "./#goals" });
+        const sent = await pushTo(data, { title: "✅ Notifications are on", body: "You'll hear about goals, milestones, club changes and get a daily recap.", tag: "test", url: "./#goals" });
         return json({ ok: sent > 0, sent, error: sent ? null : "push_failed" });
       }
       case "push_selftest": {
@@ -614,6 +704,10 @@ Deno.serve(async (req) => {
       }
       case "recap":
         return json(await recap());
+      case "recap_preview": {
+        const d = await recapData(Date.now());
+        return json({ ok: true, body: recapBody(d), data: d });
+      }
       default:
         return json({ ok: false, error: "unknown_action" }, 400);
     }

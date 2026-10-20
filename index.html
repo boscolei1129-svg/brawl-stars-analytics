@@ -389,6 +389,22 @@ section[data-tab] { display: grid; gap: 12px; }
 .barrow .end small { display: block; color: var(--muted); font-size: 10.5px; }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .track.grow .blk { animation: none; } }
 
+/* Notification settings */
+.li.pref { align-items: flex-start; padding: 13px 0; }
+.li.pref .toggle { margin-top: 1px; }
+.li .t2.desc { white-space: normal; overflow: visible; line-height: 1.45; margin-top: 3px; font-size: 12.5px; }
+.when { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.when .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.when .next { font-size: 12px; color: var(--muted); }
+.timepick {
+  -webkit-appearance: none; appearance: none; font-family: var(--font-num); font-size: 15px; font-weight: 700; color: var(--teal);
+  background: rgba(39, 211, 195, 0.07); border: 1px solid rgba(39, 211, 195, 0.45); border-radius: 0; padding: 7px 10px; min-width: 116px; min-height: 38px; text-align: left;
+}
+.timepick::-webkit-date-and-time-value { text-align: left; }
+.timepick::-webkit-calendar-picker-indicator { filter: invert(0.75) sepia(1) hue-rotate(120deg); cursor: pointer; }
+.timepick:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(39, 211, 195, 0.16); }
+.timepick:disabled { opacity: 0.5; }
+
 /* Motion */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes glow { 0% { text-shadow: 0 0 0 transparent; } 25% { text-shadow: 0 0 22px currentColor; } 100% { text-shadow: 0 0 0 transparent; } }
@@ -469,7 +485,7 @@ button:active { transform: scale(0.97); }
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
     showAllMaps: false, showAllLog: false, goalKind: "player",
     chartMode: "time", open: { modes: false, maps: false, log: true }, confirmDel: null, dbWriteBlocked: false,
-    push: { supported: false, ios: false, standalone: false, permission: "default", endpoint: null, busy: false, msg: "", prefs: { goals: true, milestones: true, roster: true, recap: true } },
+    push: { supported: false, ios: false, standalone: false, permission: "default", endpoint: null, busy: false, msg: "", prefs: { goals: true, milestones: true, roster: true, recap: true, recap_at: "22:00" } },
   };
   let D = null;
 
@@ -1422,7 +1438,20 @@ button:active { transform: scale(0.97); }
   }
 
   // ---------- notifications ----------
-  const PUSH_KINDS = [["goals", "Goals reached"], ["milestones", "Trophy and club milestones"], ["roster", "Members joining or leaving"], ["recap", "Nightly recap at 10 PM"]];
+  const PUSH_KINDS = [
+    ["goals", "Goals reached", "When you hit a target you set above."],
+    ["milestones", "Trophy milestones", "Every 500 trophies for you and every 5,000 for the club."],
+    ["roster", "Members joining or leaving", "When someone joins or leaves Stargazers, with the new member count."],
+    ["recap", "Daily recap", "Your last 24 hours: battles, trophies and win rate. Plus the trophies other members won for the club, not counting you or new members joining."],
+  ];
+  const myZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } };
+  const pushPrefsOut = () => ({ ...S.push.prefs, tz: myZone() });
+  const recapAt = () => (/^([01]\d|2[0-3]):[0-5]\d$/.test(S.push.prefs.recap_at || "") ? S.push.prefs.recap_at : "22:00");
+  const clock = (hhmm) => { const d = new Date(); d.setHours(+hhmm.slice(0, 2), +hhmm.slice(3), 0, 0); return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+  function recapNext() {
+    const at = recapAt(), d = new Date(); d.setHours(+at.slice(0, 2), +at.slice(3), 0, 0);
+    return "Next one " + (d.getTime() > Date.now() ? "today" : "tomorrow") + " at " + clock(at) + ".";
+  }
   function pushCard(locked) {
     const P = S.push;
     let inner;
@@ -1433,11 +1462,17 @@ button:active { transform: scale(0.97); }
     } else if (locked) {
       inner = '<div class="sub">Unlock goal editing above to turn on notifications for this device.</div>';
     } else if (!P.endpoint) {
-      inner = '<div class="sub">Get an alert when you reach a goal, pass a trophy milestone (every 500 for you, every 5,000 for the club), when members join or leave, and a recap of your day at 10 PM.</div>' +
+      inner = '<div class="sub">Get an alert when you reach a goal, pass a trophy milestone (every 500 for you, every 5,000 for the club), when members join or leave, and a daily recap at a time you choose.</div>' +
         '<div class="row mt"><button class="btn" data-push="on"' + (P.busy ? " disabled" : "") + ">" + (P.busy ? "Turning on…" : "Turn on notifications") + "</button></div>";
     } else {
-      inner = '<div class="list">' + PUSH_KINDS.map(([k, label]) =>
-          '<div class="li"><div class="main"><div class="t1">' + label + '</div></div><button class="toggle" role="switch" data-pref="' + k + '" aria-checked="' + (P.prefs[k] !== false) + '" aria-label="' + label + '"' + (P.busy ? " disabled" : "") + "><i></i></button></div>").join("") + "</div>" +
+      inner = '<div class="list">' + PUSH_KINDS.map(([k, label, about]) => {
+          const on = P.prefs[k] !== false;
+          const when = k === "recap" && on
+            ? '<div class="when"><span class="lbl">Send at</span><input class="timepick" type="time" data-recap-at value="' + recapAt() + '" aria-label="Daily recap time"' + (P.busy ? " disabled" : "") + '><span class="next">' + esc(recapNext()) + "</span></div>"
+            : "";
+          return '<div class="li pref"><div class="main"><div class="t1">' + label + '</div><div class="t2 desc" id="pd-' + k + '">' + about + "</div>" + when + "</div>" +
+            '<button class="toggle" role="switch" data-pref="' + k + '" aria-checked="' + on + '" aria-label="' + label + '" aria-describedby="pd-' + k + '"' + (P.busy ? " disabled" : "") + "><i></i></button></div>";
+        }).join("") + "</div>" +
         '<div class="row mt" style="justify-content:space-between"><button class="btn ghost" data-push="test"' + (P.busy ? " disabled" : "") + '>Send a test</button><button class="link" data-push="off"' + (P.busy ? " disabled" : "") + ">Turn off on this device</button></div>";
     }
     return '<div class="card" id="pushCard"><h2>Notifications<span class="sp"></span>' + (P.endpoint ? '<span class="aside up-t">On</span>' : "") + "</h2>" + inner +
@@ -1467,7 +1502,7 @@ button:active { transform: scale(0.97); }
       const { key } = await callFn({ action: "push_key" });
       const reg = await navigator.serviceWorker.ready;
       const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlBytes(key) }));
-      await callFn({ action: "push_subscribe", code: S.ownerCode, sub: sub.toJSON(), prefs: P.prefs });
+      await callFn({ action: "push_subscribe", code: S.ownerCode, sub: sub.toJSON(), prefs: pushPrefsOut() });
       P.endpoint = sub.endpoint;
       P.msg = "Notifications are on for this device. Send a test to check.";
     } catch (e) {
@@ -1500,8 +1535,20 @@ button:active { transform: scale(0.97); }
     try { localStorage.setItem("pushPrefs", JSON.stringify(P.prefs)); } catch (e) {}
     render();
     if (P.endpoint && S.ownerCode) {
-      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: P.prefs }); }
+      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); }
       catch (e) { P.prefs[k] = !P.prefs[k]; P.msg = "Couldn't save that setting. Try again."; render(); }
+    }
+  }
+  async function pushTime(v) {
+    const P = S.push, before = recapAt();
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v) || v === before) { render(); return; }
+    P.prefs.recap_at = v; P.msg = "";
+    try { localStorage.setItem("pushPrefs", JSON.stringify(P.prefs)); } catch (e) {}
+    render();
+    if (P.endpoint && S.ownerCode) {
+      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); P.msg = "Daily recap set for " + clock(v) + "."; }
+      catch (e) { P.prefs.recap_at = before; P.msg = "Couldn't save the recap time. Try again."; }
+      render();
     }
   }
 
@@ -1526,6 +1573,8 @@ button:active { transform: scale(0.97); }
     document.documentElement.style.setProperty("--hdr-h", ($(".top").offsetHeight || 120) + "px");
     for (const sec of document.querySelectorAll("section[data-tab]")) sec.hidden = sec.dataset.tab !== S.tab;
     const sec = $('section[data-tab="' + S.tab + '"]');
+    const picking = document.activeElement;
+    if (picking && picking.matches && picking.matches("input[data-recap-at]") && sec.contains(picking)) return;
     const active = document.activeElement && document.activeElement.id;
     const caret = active === "brSearch" ? document.activeElement.selectionStart : null;
     charts.length = 0;
@@ -1604,8 +1653,14 @@ button:active { transform: scale(0.97); }
     if (ev.target.id === "brSearch") { S.brQuery = ev.target.value; render(); }
   });
   document.addEventListener("change", (ev) => {
+    // Some phones report every turn of the time wheel, so the time is saved once it settles or the picker closes.
+    if (ev.target.matches && ev.target.matches("input[data-recap-at]")) { const el = ev.target; clearTimeout(recapTimer); recapTimer = setTimeout(() => flushRecap(el), document.activeElement === el ? 1500 : 0); return; }
     if (ev.target.id === "gKind") { S.goalKind = ev.target.value; const w = $("#gBrWrap"); if (w) w.hidden = S.goalKind !== "brawler"; }
   });
+  // While the recap time picker is open the screen isn't redrawn (that would close it), so catch up once it closes.
+  let recapTimer = null;
+  const flushRecap = (el) => { clearTimeout(recapTimer); recapTimer = null; pushTime(el.value); };
+  document.addEventListener("focusout", (ev) => { if (ev.target.matches && ev.target.matches("input[data-recap-at]")) { if (recapTimer) flushRecap(ev.target); else setTimeout(render, 0); } });
   document.addEventListener("submit", (ev) => {
     if (ev.target.id === "codeForm") { ev.preventDefault(); unlock($("#ownerCode").value); return; }
     if (ev.target.id !== "goalForm") return;

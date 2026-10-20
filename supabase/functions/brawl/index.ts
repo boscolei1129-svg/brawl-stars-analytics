@@ -1,13 +1,18 @@
 // Brawl Stars Analytics server function. Every profile is a player tag (plus the club it follows);
 // requests name it with `tag` (no #). Requests without one mean the original profile, LEGACY.
 //   POST {action:"profile_lookup", tag, club?}     check a player (and club) before adding: name, icon, trophies
-//   POST {action:"profile_add", tag, club?, code}  start tracking a new profile; `code` guards its goals and alerts
+//   POST {action:"profile_add", tag, club?}        start tracking a new profile (anyone can; game stats are public)
 //   POST {action:"refresh", tag, src?:"auto"|"live"}  fetch fresh stats, save a reading and new battles
-//   POST {action:"check_code", tag, code}         confirm a profile's code (unlocks goal editing)
-//   POST {action:"goal_add", tag, code, kind, target, brawler?} / {action:"goal_delete", tag, code, id}
+// Goals and alerts are private to a device. Each device sends `device`, a random secret it made itself; devices
+// linked with a one-time code share one owner. Nobody else can see or change them.
+//   POST {action:"goals_list", tag, device} / {action:"goal_add", tag, device, kind, target, brawler?} / {action:"goal_delete", tag, device, id}
+//   POST {action:"link_create", device}            a 6-digit code (10 minutes, single use) to link another device
+//   POST {action:"link_redeem", device, code}      this device joins the device that made the code
+//   POST {action:"claim_legacy", tag, device, code, endpoint?}  move goals made under the old per-player code to this device
+//   POST {action:"check_code", tag, code}         old app versions only
 //   POST {action:"push_key"}                       public key for turning on notifications
-//   POST {action:"push_subscribe", tag, code, sub, prefs?} / {action:"push_prefs", tag, code, endpoint, prefs}
-//   POST {action:"push_unsubscribe", tag, endpoint} / {action:"push_test", tag, code, endpoint}
+//   POST {action:"push_subscribe", tag, device, sub, prefs?} / {action:"push_prefs", tag, device, endpoint, prefs}
+//   POST {action:"push_unsubscribe", tag, endpoint} / {action:"push_test", tag, endpoint}
 //   POST {action:"recap"}                          daily summary for devices whose chosen time just passed (run by the schedule every 5 minutes)
 //   POST {action:"recap_preview", tag}             the daily summary text, without sending it
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -24,6 +29,9 @@ const STEP_ME = 500, STEP_CLUB = 5000; // milestone sizes for notifications
 const GAP_MS = 20 * 60_000; // battles closer together than this are one play session
 const BATTLE_MS = 3 * 60_000; // a session starts about one battle before its first battle ends
 const ACTIVITY_EVERY_MS = 4 * 60_000; // read members' battle logs at most this often
+const DEV_RE = /^[A-Za-z0-9_-]{43}$/; // a device secret: 32 random bytes, base64url
+const LINK_MS = 10 * 60_000; // one-time link codes last this long
+const MAX_GOALS = 25; // per player, per owner
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -449,10 +457,11 @@ async function pushTo(subs: any[], payload: unknown) {
   }
   return sent;
 }
-async function notify(tag: string, kind: string, payload: unknown) {
+// Goal alerts only go to the devices that own the goal; everything else is about public stats.
+async function notify(tag: string, kind: string, payload: unknown, owner?: string | null) {
   const { data, error } = await sb.from("push_subs").select("*").eq("tag", tag);
   if (error) throw error;
-  return pushTo((data ?? []).filter((s: any) => s.prefs?.[kind] !== false), payload);
+  return pushTo((data ?? []).filter((s: any) => s.prefs?.[kind] !== false && (owner === undefined || (s.owner ?? null) === (owner ?? null))), payload);
 }
 const fmtN = (n: number) => Math.round(n).toLocaleString("en-US");
 const sgnN = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmtN(Math.abs(n));
@@ -472,7 +481,7 @@ async function checkEvents(p: Profile, cur: { trophies: number | null; club: num
   const clubTag = cur.newClub?.tag ?? cur.prevClub?.tag ?? null;
   const moved = !!clubTag && st.clubTag !== undefined && st.clubTag !== clubTag;
   if (clubTag && st.clubTag !== clubTag) { st.clubTag = clubTag; st.club = null; }
-  const out: { kind: string; payload: unknown }[] = [];
+  const out: { kind: string; payload: unknown; owner?: string | null }[] = [];
   if (cur.trophies != null) {
     const m = Math.floor(cur.trophies / STEP_ME) * STEP_ME;
     if (st.me == null) st.me = m;
@@ -500,7 +509,7 @@ async function checkEvents(p: Profile, cur: { trophies: number | null; club: num
     if (first || (g.start != null && g.start >= g.target)) continue; // already there when it was set
     const name = g.kind === "player" ? fmtN(g.target) + " trophies" : g.kind === "club" ? "Club at " + fmtN(g.target)
       : g.kind === "elo" ? fmtN(g.target) + " Elo" : titleCase(b?.[3] ?? g.brawler) + " at " + fmtN(g.target);
-    out.push({ kind: "goals", payload: { title: "🎯 Goal reached", body: who + ": " + name + ". Now at " + fmtN(v) + ".", tag: "goal-" + g.id, url: url("goals") } });
+    out.push({ kind: "goals", owner: g.owner ?? null, payload: { title: "🎯 Goal reached", body: who + ": " + name + ". Now at " + fmtN(v) + ".", tag: "goal-" + g.id, url: url("goals") } });
   }
   st.goals = st.goals.filter((id: string) => (goals ?? []).some((g: any) => g.id === id));
   if (!first && !moved && cur.prevClub?.members && cur.newClub?.members && cur.prevClub.tag === cur.newClub.tag) {
@@ -516,7 +525,7 @@ async function checkEvents(p: Profile, cur: { trophies: number | null; club: num
   }
   await setSetting("notify_state:" + p.tag, st);
   let sent = 0;
-  for (const o of out) sent += await notify(p.tag, o.kind, o.payload);
+  for (const o of out) sent += await notify(p.tag, o.kind, o.payload, o.kind === "goals" ? o.owner ?? null : undefined);
   return sent;
 }
 
@@ -655,8 +664,59 @@ async function sha256(text: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-async function codeOk(tag: string, code: unknown) {
+// ---------- abuse limits ----------
+// The caller's address. Supabase's gateway (Cloudflare) sets cf-connecting-ip itself and rewrites
+// X-Forwarded-For, so a caller can't fake either (checked on the live function, Oct 2026).
+function ipOf(req: Request) {
+  const cf = req.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
+  const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return xff[0] ?? req.headers.get("x-real-ip") ?? "unknown";
+}
+// True while `key` has been used at most `max` times in the current `windowS`-second window. If the counter
+// itself fails, the request goes through: a broken limit shouldn't take the app down.
+async function allow(key: string, windowS: number, max: number) {
+  const { data, error } = await sb.rpc("rate_hit", { p_key: key, p_window: windowS, p_max: max });
+  if (error) { console.error("rate_hit", error.message); return true; }
+  return data === true;
+}
+class Limited extends Error { constructor() { super("slow_down"); } }
+async function limit(key: string, windowS: number, max: number) { if (!(await allow(key, windowS, max))) throw new Limited(); }
+
+// ---------- devices (who owns goals and alerts) ----------
+// A device is known by the hash of its secret. The first write from a new device registers it.
+async function ownerOf(device: unknown, ip: string, create: boolean): Promise<string | null> {
+  if (typeof device !== "string" || !DEV_RE.test(device)) return null;
+  const key_hash = await sha256("device:" + device);
+  const { data, error } = await sb.from("device_keys").select("owner, last_seen_at").eq("key_hash", key_hash).maybeSingle();
+  if (error) throw error;
+  if (data) {
+    if (Date.now() - ms(data.last_seen_at) > 86_400_000) await sb.from("device_keys").update({ last_seen_at: new Date().toISOString() }).eq("key_hash", key_hash);
+    return data.owner;
+  }
+  if (!create) return null;
+  await limit("newdev:" + ip, 3600, 30);
+  const owner = crypto.randomUUID();
+  const ins = await sb.from("device_keys").insert({ key_hash, owner });
+  if (ins.error) {
+    if (ins.error.code !== "23505") throw ins.error;
+    const again = await sb.from("device_keys").select("owner").eq("key_hash", key_hash).single();
+    return again.data?.owner ?? null;
+  }
+  return owner;
+}
+const deviceHash = (device: string) => sha256("device:" + device);
+// Six digits, from the system's secure random source (rejection sampling keeps every code equally likely).
+function sixDigits() {
+  const a = new Uint32Array(1);
+  for (;;) { crypto.getRandomValues(a); if (a[0] < 4_294_000_000) return String(a[0] % 1_000_000).padStart(6, "0"); }
+}
+
+// Old app versions: each player had one code, chosen by whoever added them. Only used to move old goals
+// to a device now. Guesses are limited per player and per address.
+async function codeOk(tag: string, code: unknown, ip: string) {
   if (typeof code !== "string" || !code.trim()) return false;
+  if (!(await allow("code:" + tag, 3600, 10)) || !(await allow("codeip:" + ip, 3600, 20))) return false;
   const { data } = await sb.from("profile_codes").select("code_sha256").eq("tag", tag).maybeSingle();
   const ok = !!data && data.code_sha256 === (await sha256(code.trim().toUpperCase()));
   if (!ok) await new Promise((r) => setTimeout(r, 800)); // slow down guessing
@@ -714,10 +774,12 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body */ }
   const tag = body.tag == null || body.tag === "" ? LEGACY : normTag(body.tag);
+  const ip = ipOf(req);
   try {
     switch (body.action) {
       case "profile_lookup": {
         if (!TAG_RE.test(tag)) return fail("bad_tag");
+        await limit("look:" + ip, 600, 40);
         const [found, existing] = await Promise.all([lookup(tag, body.club), getProfile(tag)]);
         return json({ ok: true, ...found, tracked: !!existing, profile: existing ? publicProfile(existing) : null });
       }
@@ -725,12 +787,16 @@ Deno.serve(async (req) => {
         if (!TAG_RE.test(tag)) return fail("bad_tag");
         const existing = await getProfile(tag);
         if (existing) {
-          // Already tracked (someone else added it): this device just saves it.
-          if (!existing.active) await sb.from("profiles").update({ active: true, last_open_at: new Date().toISOString() }).eq("tag", tag);
-          return json({ ok: true, exists: true, profile: publicProfile(existing) });
+          // Already tracked (someone else added it): this device just saves it. A profile that was set to some
+          // other club (or none) goes back to following the player's own club when anyone adds it that way, and
+          // can't be pointed away from it again, so nobody can spoil a player's profile for everyone else.
+          const patch: Record<string, unknown> = {};
+          if (!existing.active) Object.assign(patch, { active: true, last_open_at: new Date().toISOString() });
+          if (!existing.follow && body.club === undefined) patch.follow = true;
+          if (Object.keys(patch).length) await sb.from("profiles").update(patch).eq("tag", tag);
+          return json({ ok: true, exists: true, profile: publicProfile({ ...existing, ...patch }) });
         }
-        const code = String(body.code ?? "").trim().toUpperCase();
-        if (!/^[A-Z0-9]{4,12}$/.test(code)) return fail("bad_code");
+        await limit("add:" + ip, 3600, 6);
         const { count } = await sb.from("profiles").select("tag", { count: "exact", head: true }).eq("active", true);
         if ((count ?? 0) >= MAX_PROFILES) return fail("full", 409);
         const found = await lookup(tag, body.club);
@@ -740,8 +806,6 @@ Deno.serve(async (req) => {
           club_name: found.club?.name ?? null, club_badge: found.club?.badge ?? null, follow };
         const { error } = await sb.from("profiles").insert(row);
         if (error) { if (error.code === "23505") return json({ ok: true, exists: true, profile: row }); throw error; }
-        const { error: cErr } = await sb.from("profile_codes").insert({ tag, code_sha256: await sha256(code) });
-        if (cErr) throw cErr;
         // First reading now, so the dashboard has something to show straight away.
         let first: unknown = null;
         try { first = await refresh("live", row); } catch (e) { first = { error: String((e as Error)?.message ?? e) }; }
@@ -753,40 +817,113 @@ Deno.serve(async (req) => {
         return json(await refresh(body.src === "live" ? "live" : "auto", p));
       }
       case "check_code":
-        return json({ ok: await codeOk(tag, body.code) });
+        return json({ ok: await codeOk(tag, body.code, ip) });
+
+      // ----- goals: private to the device (and the devices linked to it) -----
+      case "goals_list": {
+        const owner = await ownerOf(body.device, ip, false);
+        if (!owner) return json({ ok: true, goals: [] });
+        const { data, error } = await sb.from("goals").select("id, kind, target, brawler, start, created_at").eq("tag", tag).eq("owner", owner).order("created_at");
+        if (error) throw error;
+        return json({ ok: true, goals: data ?? [] });
+      }
       case "goal_add": {
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
+        const owner = await ownerOf(body.device, ip, true);
+        if (!owner) return fail("no_device", 401);
+        await limit("goal:" + owner, 3600, 60);
         const kind = String(body.kind);
         const target = Math.round(Number(body.target));
-        if (!["player", "club", "brawler", "elo"].includes(kind) || !(target > 0)) return fail("bad_goal");
-        const brawler = kind === "brawler" ? String(body.brawler ?? "") : null;
+        if (!["player", "club", "brawler", "elo"].includes(kind) || !(target > 0) || target > 1e9) return fail("bad_goal");
+        const brawler = kind === "brawler" ? String(body.brawler ?? "").slice(0, 40) : null;
         if (kind === "brawler" && !brawler) return fail("bad_goal");
+        const { count } = await sb.from("goals").select("id", { count: "exact", head: true }).eq("tag", tag).eq("owner", owner);
+        if ((count ?? 0) >= MAX_GOALS) return fail("too_many_goals", 409);
         const start = await currentValue(tag, kind, brawler ?? undefined);
-        const { data, error } = await sb.from("goals").insert({ tag, kind, target, brawler, start }).select().single();
+        const { data, error } = await sb.from("goals").insert({ tag, kind, target, brawler, start, owner }).select("id, kind, target, brawler, start, created_at").single();
         if (error) throw error;
         return json({ ok: true, goal: data });
       }
       case "goal_delete": {
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
-        const { error } = await sb.from("goals").delete().eq("id", String(body.id)).eq("tag", tag);
+        const owner = await ownerOf(body.device, ip, false);
+        if (!owner) return fail("no_device", 401);
+        const { error } = await sb.from("goals").delete().eq("id", String(body.id)).eq("tag", tag).eq("owner", owner);
         if (error) throw error;
         return json({ ok: true });
       }
+      case "link_create": {
+        const owner = await ownerOf(body.device, ip, true);
+        if (!owner) return fail("no_device", 401);
+        await limit("linkc:" + owner, 3600, 10);
+        await sb.from("device_links").delete().eq("owner", owner);
+        const expires_at = new Date(Date.now() + LINK_MS).toISOString();
+        for (let i = 0; i < 5; i++) {
+          const code = sixDigits();
+          const { error } = await sb.from("device_links").insert({ code_hash: await sha256("link:" + code), owner, expires_at });
+          if (!error) return json({ ok: true, code, expires_at });
+          if (error.code !== "23505") throw error;
+        }
+        throw new Error("no_code");
+      }
+      case "link_redeem": {
+        if (typeof body.device !== "string" || !DEV_RE.test(body.device)) return fail("no_device", 401);
+        // Six digits are only safe because guesses are scarce: per address, and for everyone together.
+        await limit("linkr:" + ip, 3600, 10);
+        await limit("linkr:all", 3600, 300);
+        const code = String(body.code ?? "").replace(/\D/g, "");
+        if (code.length !== 6) return fail("bad_link");
+        const code_hash = await sha256("link:" + code);
+        const { data: link } = await sb.from("device_links").select("*").eq("code_hash", code_hash).gt("expires_at", new Date().toISOString()).maybeSingle();
+        if (!link) return fail("bad_link", 404);
+        const key_hash = await deviceHash(body.device);
+        const { data: mine } = await sb.from("device_keys").select("owner").eq("key_hash", key_hash).maybeSingle();
+        if (mine?.owner === link.owner) return fail("same_device");
+        await sb.from("device_links").delete().eq("code_hash", code_hash); // single use
+        let moved = 0;
+        if (mine?.owner) {
+          // This device (and any linked to it) joins the other one, bringing its own goals and alerts along.
+          const g = await sb.from("goals").update({ owner: link.owner }, { count: "exact" }).eq("owner", mine.owner);
+          moved = g.count ?? 0;
+          await sb.from("push_subs").update({ owner: link.owner }).eq("owner", mine.owner);
+          await sb.from("device_keys").update({ owner: link.owner }).eq("owner", mine.owner);
+        } else {
+          const { error } = await sb.from("device_keys").insert({ key_hash, owner: link.owner });
+          if (error) throw error;
+        }
+        return json({ ok: true, moved });
+      }
+      case "claim_legacy": {
+        // A phone that still remembers a player's old code takes over the goals made with it.
+        if (!(await codeOk(tag, body.code, ip))) return fail("wrong_code", 403);
+        const owner = await ownerOf(body.device, ip, true);
+        if (!owner) return fail("no_device", 401);
+        const g = await sb.from("goals").update({ owner }, { count: "exact" }).eq("tag", tag).is("owner", null);
+        if (g.error) throw g.error;
+        if (body.endpoint) await sb.from("push_subs").update({ owner }).eq("tag", tag).eq("endpoint", String(body.endpoint)).is("owner", null);
+        return json({ ok: true, goals: g.count ?? 0 });
+      }
+
+      // ----- notifications -----
       case "push_key":
         return json({ ok: true, key: (await vapid()).publicKey });
       case "push_subscribe": {
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
+        const owner = await ownerOf(body.device, ip, true);
+        if (!owner) return fail("no_device", 401);
+        await limit("sub:" + ip, 3600, 30);
+        if (!(await getProfile(tag))) return fail("unknown_profile", 404);
         const sub = cleanSub(body.sub);
         if (!sub) return fail("bad_subscription");
         const prefs = cleanPrefs(body.prefs);
-        const { error } = await sb.from("push_subs").upsert({ ...sub, tag, prefs, last_recap: recapMark(prefs, Date.now()) }, { onConflict: "endpoint,tag" });
+        const { error } = await sb.from("push_subs").upsert({ ...sub, tag, owner, prefs, last_recap: recapMark(prefs, Date.now()) }, { onConflict: "endpoint,tag" });
         if (error) throw error;
         return json({ ok: true });
       }
       case "push_prefs": {
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
+        // The subscription's endpoint is a secret only that phone knows, so it is what proves the request.
+        const owner = await ownerOf(body.device, ip, false);
         const prefs = cleanPrefs(body.prefs);
-        const { error } = await sb.from("push_subs").update({ prefs, last_recap: recapMark(prefs, Date.now()) }).eq("endpoint", String(body.endpoint ?? "")).eq("tag", tag);
+        const patch: Record<string, unknown> = { prefs, last_recap: recapMark(prefs, Date.now()) };
+        if (owner) patch.owner = owner;
+        const { error } = await sb.from("push_subs").update(patch).eq("endpoint", String(body.endpoint ?? "")).eq("tag", tag);
         if (error) throw error;
         return json({ ok: true });
       }
@@ -799,7 +936,7 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
       case "push_test": {
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
+        await limit("ptest:" + ip, 3600, 20);
         const { data } = await sb.from("push_subs").select("*").eq("endpoint", String(body.endpoint ?? "")).eq("tag", tag);
         if (!data?.length) return fail("not_subscribed", 404);
         const p = await getProfile(tag);
@@ -808,7 +945,7 @@ Deno.serve(async (req) => {
       }
       case "push_selftest": {
         // Builds (but doesn't send) an encrypted push for a test subscription, to check the crypto works here.
-        if (!(await codeOk(tag, body.code))) return fail("wrong_code", 403);
+        await limit("selftest:" + ip, 3600, 10);
         const sub = cleanSub(body.sub);
         if (!sub) return fail("bad_subscription");
         const v = await vapid();
@@ -817,9 +954,19 @@ Deno.serve(async (req) => {
         const bodyB64 = btoa(String.fromCharCode(...new Uint8Array(d.body)));
         return json({ ok: true, publicKey: v.publicKey, headers: d.headers, body: bodyB64 });
       }
-      case "recap":
-        return json(await recap());
+      case "recap": {
+        // Run by the schedule every 5 minutes. Extra calls in between are ignored.
+        if (!(await allow("recap", 120, 1))) return json({ ok: true, skipped: true });
+        const out = await recap();
+        if (new Date().getUTCMinutes() < 5) {
+          // Once an hour: drop old abuse counters and expired link codes.
+          await sb.from("rate_hits").delete().lt("at", new Date(Date.now() - 2 * 86_400_000).toISOString());
+          await sb.from("device_links").delete().lt("expires_at", new Date().toISOString());
+        }
+        return json(out);
+      }
       case "recap_preview": {
+        await limit("prev:" + ip, 600, 30);
         const d = await recapData(tag, Date.now());
         return json({ ok: true, body: recapBody(d), data: d });
       }
@@ -827,6 +974,7 @@ Deno.serve(async (req) => {
         return fail("unknown_action");
     }
   } catch (e) {
+    if (e instanceof Limited) return fail("slow_down", 429);
     const msg = String((e as Error)?.message ?? e);
     // Lookup problems are answers, not server failures.
     if (["player_not_found", "club_not_found", "bad_club"].includes(msg)) return fail(msg, 404);

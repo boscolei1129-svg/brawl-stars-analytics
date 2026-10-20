@@ -171,3 +171,51 @@ select cron.schedule(
   where active and mod(hashtext(tag)::bigint + 2147483648, 15) = mod(extract(minute from now())::int, 15);
   $$
 );
+
+-- ---------- Goals and alerts private to each phone; abuse limits (Oct 2026 audit) ----------
+-- Each phone makes a random secret; only its hash is stored. Phones linked with a one-time code share an owner.
+create table public.device_keys (
+  key_hash text primary key,
+  owner uuid not null,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+create index device_keys_owner_idx on public.device_keys (owner);
+alter table public.device_keys enable row level security;
+create table public.device_links (            -- one-time 6-digit codes (hashed), 10 minutes, single use
+  code_hash text primary key,
+  owner uuid not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+create index device_links_owner_idx on public.device_links (owner);
+alter table public.device_links enable row level security;
+alter table public.goals add column owner uuid;     -- null = made with an old per-player code, not yet handed in
+create index goals_owner_tag_idx on public.goals (owner, tag);
+alter table public.push_subs add column owner uuid;  -- goal alerts only go to the goal owner's phones
+drop policy "Anyone can read goals" on public.goals; -- goals are private now; the function serves each phone its own
+
+-- Call counters for the function's abuse limits (cleared after two days by the function itself).
+create table public.rate_hits (
+  key text not null,
+  bucket bigint not null,
+  n integer not null default 0,
+  at timestamptz not null default now(),
+  primary key (key, bucket)
+);
+create index rate_hits_at_idx on public.rate_hits (at);
+alter table public.rate_hits enable row level security;
+create or replace function public.rate_hit(p_key text, p_window integer, p_max integer)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare b bigint := floor(extract(epoch from now()) / greatest(p_window, 1)); c integer;
+begin
+  insert into public.rate_hits as r (key, bucket, n) values (p_key, b, 1)
+  on conflict (key, bucket) do update set n = r.n + 1
+  returning r.n into c;
+  return c <= p_max;
+end $$;
+revoke execute on function public.rate_hit(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.rate_hit(text, integer, integer) to service_role;
+
+-- The public key only ever reads (and RLS decides what); the function writes with its own key.
+revoke insert, update, delete, truncate, references, trigger on all tables in schema public from anon, authenticated;

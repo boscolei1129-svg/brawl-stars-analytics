@@ -597,6 +597,18 @@ html.homeopen, html.homeopen body { overflow: hidden; }
 .tour-btns { display: flex; gap: 8px; }
 .tour-btns .btn { min-width: 96px; padding: 12px 16px; }
 .home-foot { display: grid; gap: 10px; justify-items: center; }
+.hf-links { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.aside.priv { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11.5px; letter-spacing: 0.2px; text-transform: none; }
+.aside.priv svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.lcode { display: flex; gap: 14px; justify-content: center; margin: 4px 0 14px; font-family: var(--font-num); font-weight: 700; font-size: 34px; letter-spacing: 6px; color: var(--fg); }
+.lcode span { padding: 8px 6px 8px 12px; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; }
+.about .tour-sheet { max-width: 560px; }
+.ab-sec { margin-top: 18px; }
+.ab-sec h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: var(--teal); }
+.ab-sec ul { margin: 0; padding: 0 0 0 18px; display: grid; gap: 8px; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+.ab-sec b { color: var(--fg); font-weight: 600; }
+.about a { color: var(--accent); }
+.note .link { font-size: inherit; padding: 0; }
 
 /* tour pictures */
 .art-chart .grid path { stroke: var(--line-2); stroke-width: 1; }
@@ -743,7 +755,7 @@ button:active { transform: scale(0.97); }
   const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
 
   const S = {
-    readings: [], battleRows: [], goals: [], sessions: [], sessClub: null, profile: null, actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
+    readings: [], battleRows: [], goals: [], sessions: [], link: {}, sessClub: null, profile: null, actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
     tab: "me", live: { busy: false, err: null, at: 0 },
     r: { me: "24h", climb: "7d", club: "7d", members: "7d" },
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
@@ -849,17 +861,32 @@ button:active { transform: scale(0.97); }
     }
     return out;
   }
+  // This phone's own secret, made here and never shown. Goals and alerts belong to it (and to phones linked to it
+  // with a one-time code), so nobody else can see or change them. No account needed.
+  function deviceKey() {
+    let d = lsGet("device");
+    if (!/^[A-Za-z0-9_-]{43}$/.test(d || "")) {
+      const b = new Uint8Array(32); crypto.getRandomValues(b);
+      d = btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      lsSet("device", d);
+    }
+    return d;
+  }
   async function callFn(body) {
-    const r = await fetch(FN_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify(Object.assign({ tag: ME }, body)) });
+    const r = await fetch(FN_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify(Object.assign({ tag: ME, device: deviceKey() }, body)) });
     let j = null;
     try { j = await r.json(); } catch (e) {}
     if (!r.ok || !j || j.ok === false && body.action !== "check_code") {
-      const err = new Error((j && j.error) || "The server answered " + r.status);
+      const err = new Error(r.status === 429 ? "Too many requests from this network. Wait a few minutes and try again." : (j && j.error) || "The server answered " + r.status);
       err.code = j && j.error;
       throw err;
     }
     return j;
   }
+  // Goals are private to this phone, so they come from the server function, not the public tables. If that fails,
+  // the goals already on screen stay.
+  const myGoals = () => callFn({ action: "goals_list" }).then((r) => r.goals || [])
+    .catch(() => S.goals.map((g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created_at: new Date(g.created || 0).toISOString() })));
   const mapGoal = (g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created: msOf(g.created_at) });
   const READ_COLS = "id,ts,checked,nb,src,trophies,club_trophies,player,brawlers,club,club_upd";
   // A copy of everything already downloaded is kept on this device, so the app opens instantly
@@ -911,7 +938,7 @@ button:active { transform: scale(0.97); }
     const prof = loadProfile().catch((e) => { if (e.code === "unknown_profile" || !S.profile) throw e; });
     if (!S.profile) await prof;
     if (full || !S.readings.length) {
-      const [rd, bt, gl, ss] = await Promise.all([restAll("readings", READ_COLS, "tag=eq." + ME), restAll("battles", "*", "tag=eq." + ME), rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc"), loadSessions(true)]);
+      const [rd, bt, gl, ss] = await Promise.all([restAll("readings", READ_COLS, "tag=eq." + ME), restAll("battles", "*", "tag=eq." + ME), myGoals(), loadSessions(true)]);
       S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal); S.sessions = ss;
     } else {
       const lastId = Math.max(...S.readings.map((r) => r.id));
@@ -922,7 +949,7 @@ button:active { transform: scale(0.97); }
       const [rd, bt, gl, ss] = await Promise.all([
         restAll("readings", READ_COLS, "tag=eq." + ME + "&id=gte." + lastId),
         restAll("battles", "*", "tag=eq." + ME + "&t=gt." + encodeURIComponent(since)),
-        rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc"),
+        myGoals(),
         loadSessions(false),
       ]);
       S.sessions = ss;
@@ -1176,6 +1203,7 @@ button:active { transform: scale(0.97); }
     if (!P) return emptyState("Your trophies will appear after the first update.");
     const p = P.p, rk = S.r.me, ms = RANGES[rk];
     const c24 = change(D.pSeries, DAY);
+    const c7 = D.pSeries.length && Date.now() - D.pSeries[0][0] > DAY ? change(D.pSeries, 7 * DAY) : null;
     const cr = change(D.pSeries, ms);
     const rr = rk === "24h" ? null : perDay(D.pSeries, ms);
     const st = wlStats(D.battles.filter((b) => inRange(b.t, rk)));
@@ -1198,6 +1226,7 @@ button:active { transform: scale(0.97); }
         '<div class="hud-sub"><span>Peak ' + fmt(p.highest) + "</span>" +
           (p.trophies >= p.highest ? '<span class="up-t">At peak</span>' : "<span>" + fmt(p.highest - p.trophies) + " off peak</span>") +
           (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
+          (c7 ? '<span class="' + tcls(c7.delta) + '">' + (c7.partial ? "Since " + esc(dShort(c7.from)) : "Δ7D") + " " + sgn(c7.delta) + "</span>" : "") +
         "</div>" +
       "</div>" +
       '<div class="jump" role="navigation" aria-label="Jump to section">' + jumps.map(([id, l]) => '<button data-jump="' + id + '">' + l + "</button>").join("") + "</div>" +
@@ -1228,7 +1257,9 @@ button:active { transform: scale(0.97); }
         "</div>" +
         '<div class="hud-sub mt"><span>Level ' + fmt(p.exp) + "</span><span>Prestige " + fmt(p.prestige) + "</span><span>" + Object.keys(P.b || {}).length + " brawlers</span></div>" +
       "</div>" +
-      '<p class="note">Stats come from BrawlTime Ninja and the official Brawl Stars API. Your server saves a reading every 15 minutes, and the app pulls a fresh one when you open it or tap the sync pill. Game art via Brawlify and BrawlTime. This app is unofficial and not endorsed by Supercell; see Supercell\'s Fan Content Policy.</p>'
+      '<p class="note">' + (D.pSeries.length ? "History starts " + esc(dShort(D.pSeries[0][0])) + ", when this player was added. " : "") +
+        "Readings every 15 minutes; win rates cover the battles the app has seen. Stats come from the official Brawl Stars API and BrawlTime. Unofficial, not endorsed by Supercell. " +
+        '<button class="link" data-about="open">About and privacy</button></p>'
     );
   }
 
@@ -1441,13 +1472,13 @@ button:active { transform: scale(0.97); }
     if (C) suggestions.push({ kind: "club", target: Math.ceil((C.c.trophies + 1) / 25000) * 25000 });
     if (P && P.p.elo) suggestions.push({ kind: "elo", target: Math.ceil((P.p.elo + 1) / 250) * 250 });
     const sugg = suggestions.filter((s) => !S.goals.some((g) => g.kind === s.kind && g.target === s.target));
-    const locked = !S.ownerCode;
+    const locked = false; // goals belong to this phone
     const lock = locked
       ? '<div class="card"><h2>Unlock goal editing</h2><form id="codeForm" class="row" novalidate><input class="input" id="ownerCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code" aria-label="Player code" style="flex:1;min-width:140px"><button class="btn" type="submit">Unlock</button></form>' +
         '<div class="sub mt" id="codeMsg">Anyone can see these goals. To add or remove them, enter the code chosen when this player was added. This phone remembers it.</div></div>'
       : "";
     const form =
-      '<div class="card cut"><h2>New goal<span class="sp"></span>' + (locked ? "" : '<button class="link" data-act="lock">Lock</button>') + "</h2>" +
+      '<div class="card cut"><h2>New goal<span class="sp"></span>' + '<span class="aside priv"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/></svg>Only on this phone</span>' + "</h2>" +
         '<form id="goalForm" class="form" novalidate>' +
           '<div class="field"><label for="gKind">Track</label><select class="input" id="gKind">' +
             [["player", "My trophies"], ["club", "Club trophies"], ["brawler", "A brawler"], ["elo", "Ranked Elo"]].map(([v, l]) => '<option value="' + v + '"' + (S.goalKind === v ? " selected" : "") + ">" + l + "</option>").join("") +
@@ -1480,7 +1511,7 @@ button:active { transform: scale(0.97); }
           (locked ? "" : confirming ? '<span class="row"><button class="btn ghost" data-del-cancel="1">Keep</button><button class="btn danger" data-del="' + esc(g.id) + '">Delete</button></span>' : '<button class="btn ghost" data-del-ask="' + esc(g.id) + '">Remove</button>') +
         "</div></div>";
     });
-    return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>') + pushCard(locked);
+    return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>') + pushCard(locked) + linkCard();
   }
 
   function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + esc(msg) + "</div></div>"; }
@@ -1642,13 +1673,13 @@ button:active { transform: scale(0.97); }
     // Now
     const nowCard =
       '<div class="card cut act-now" id="act-now">' +
-        '<div class="hud-k k-label"><span>Online now</span><span>' + esc(D.C.c.name || "Club") + "</span></div>" +
-        '<div class="big-row"><span class="pulse' + (A.online.length ? "" : " off") + '"></span><span class="hero-num teal" data-k="online" data-v="' + A.online.length + '" style="margin:6px 0">' + A.online.length + '</span><span class="of">/ ' + A.members.length + " playing</span></div>" +
+        '<div class="hud-k k-label"><span>Recently active</span><span>' + esc(D.C.c.name || "Club") + "</span></div>" +
+        '<div class="big-row"><span class="pulse' + (A.online.length ? "" : " off") + '"></span><span class="hero-num teal" data-k="online" data-v="' + A.online.length + '" style="margin:6px 0">' + A.online.length + '</span><span class="of">/ ' + A.members.length + " members</span></div>" +
         (A.online.length
           ? '<div class="who-on">' + A.online.map((m) => '<span class="p">' + avatar(m) + esc(m.name) + '<span class="ago">' + esc(agoShort(A.lastEnd(m.tag))) + "</span></span>").join("") + "</div>"
           : (() => { const lastM = A.members.filter((m) => A.lastEnd(m.tag)).sort((a, b) => A.lastEnd(b.tag) - A.lastEnd(a.tag))[0];
               return '<div class="sub">No one is in a battle right now.' + (lastM ? " Last active: " + esc(lastM.name) + ", " + esc(ago(A.lastEnd(lastM.tag))) + "." : "") + "</div>"; })()) +
-        '<div class="sub mt">Brawl Stars doesn\'t show who\'s online, so a member counts as online if they finished a battle in the last 12 minutes. Battle logs are read every 15 minutes (more often while the app is open).</div>' +
+        '<div class="sub mt">An estimate: Brawl Stars doesn\'t share who\'s online, so a member counts as recently active if one of their battles ended in the last 12 minutes. They may have stopped since, and someone who just started won\'t show until a battle ends. Battle logs are read every 4 to 15 minutes.</div>' +
       "</div>";
     const tiles =
       '<div class="tiles">' +
@@ -1678,7 +1709,7 @@ button:active { transform: scale(0.97); }
         ? '<div class="adetail"><div class="sess">' + sess.map((x) => '<div><span>' + esc(tShort(x.s)) + " – " + esc(tShort(x.e)) + " · " + esc(dur(x.e - x.s)) + "</span><span>" + x.n + (x.n === 1 ? " battle" : " battles") + (x.tc ? " · " + sgn(x.tc) : "") + (modeTop(x.modes) ? " · " + esc(modeTop(x.modes)) : "") + "</span></div>").join("") + "</div>" +
             '<div><div class="k-label" style="margin-bottom:6px">Usually plays · last ' + Math.min(14, A.days) + (A.days === 1 ? " day" : " days") + '</div><div class="strip">' + usual(m.tag).map((v) => '<i style="--a:' + (v ? (0.15 + v * 0.85).toFixed(2) : 0) + '"></i>').join("") + "</div>" +
             '<div class="axis"><span style="left:0">12 AM</span><span style="left:25%">6 AM</span><span style="left:50%">12 PM</span><span style="left:75%">6 PM</span><span style="left:100%">12 AM</span></div></div>' +
-            '<div class="sub">' + (isOn ? "Playing now." : A.lastEnd(m.tag) ? "Last battle " + esc(ago(A.lastEnd(m.tag))) + "." : "") + " This week: " + esc(dur(playIn(A.by.get(m.tag), now - 7 * DAY, now).ms)) + " across " + playIn(A.by.get(m.tag), now - 7 * DAY, now).k + " sessions.</div></div>"
+            '<div class="sub">' + (isOn ? "Likely playing: last battle " + esc(ago(A.lastEnd(m.tag))) + "." : A.lastEnd(m.tag) ? "Last battle " + esc(ago(A.lastEnd(m.tag))) + "." : "") + " Estimated this week: " + esc(dur(playIn(A.by.get(m.tag), now - 7 * DAY, now).ms)) + " across " + playIn(A.by.get(m.tag), now - 7 * DAY, now).k + " sessions.</div></div>"
         : "";
       return '<button class="arow" data-act-m="' + esc(m.tag) + '" aria-expanded="' + open + '">' + avatar(m) +
         '<span class="nm">' + (isOn ? '<span class="pulse"></span>' : "") + "<b>" + esc(m.name) + "</b>" + (m.tag === ME ? '<span class="you">YOU</span>' : "") + "</span>" +
@@ -1699,9 +1730,9 @@ button:active { transform: scale(0.97); }
     const order = [1, 2, 3, 4, 5, 6, 0];
     const heat =
       '<div class="card" id="act-rhythm"><h2>Club rhythm<span class="sp"></span><span class="aside">' + (A.days >= 14 ? "last 14 days" : A.days + (A.days === 1 ? " day so far" : " days so far")) + "</span></h2>" +
-        '<div class="heat">' + order.map((wd) => "<b>" + WD[wd] + "</b>" + A.avg[wd].map((v, h) => '<i title="' + WD[wd] + " " + hourLabel(h) + ": " + v.toFixed(1) + ' online"' + (A.peakCell && A.peakCell[0] === wd && A.peakCell[1] === h && v > 0 ? ' class="peak"' : "") + ' style="--a:' + (v ? (0.12 + (v / maxAvg) * 0.88).toFixed(2) : 0) + '"></i>').join("")).join("") + "</div>" +
+        '<div class="heat">' + order.map((wd) => "<b>" + WD[wd] + "</b>" + A.avg[wd].map((v, h) => '<i title="' + WD[wd] + " " + hourLabel(h) + ": " + v.toFixed(1) + ' active on average"' + (A.peakCell && A.peakCell[0] === wd && A.peakCell[1] === h && v > 0 ? ' class="peak"' : "") + ' style="--a:' + (v ? (0.12 + (v / maxAvg) * 0.88).toFixed(2) : 0) + '"></i>').join("")).join("") + "</div>" +
         '<div class="heat-x"><span></span><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span></div>' +
-        '<div class="row mt" style="justify-content:space-between"><span class="sub">' + (A.peakCell && A.avg[A.peakCell[0]][A.peakCell[1]] > 0 ? "Busiest: " + WD[A.peakCell[0]] + " around " + esc(hourLabel(A.peakCell[1])) + " (" + A.avg[A.peakCell[0]][A.peakCell[1]].toFixed(1) + " online on average)." : "Not enough activity yet. Hours count from when tracking began.") + "</span>" +
+        '<div class="row mt" style="justify-content:space-between"><span class="sub">' + (A.peakCell && A.avg[A.peakCell[0]][A.peakCell[1]] > 0 ? "Busiest: " + WD[A.peakCell[0]] + " around " + esc(hourLabel(A.peakCell[1])) + " (" + A.avg[A.peakCell[0]][A.peakCell[1]].toFixed(1) + " active on average)." : "Not enough activity yet. Hours count from when tracking began.") + "</span>" +
           '<span class="legend-ramp">fewer<i></i>more</span></div>' +
         (A.days < 7 ? '<div class="sub mt">Each square is the average number of members playing in that hour. It fills in over the next two weeks.</div>' : "") +
       "</div>";
@@ -1788,12 +1819,12 @@ button:active { transform: scale(0.97); }
       const { key } = await callFn({ action: "push_key" });
       const reg = await navigator.serviceWorker.ready;
       const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlBytes(key) }));
-      await callFn({ action: "push_subscribe", code: S.ownerCode, sub: sub.toJSON(), prefs: pushPrefsOut() });
+      await callFn({ action: "push_subscribe", sub: sub.toJSON(), prefs: pushPrefsOut() });
       P.endpoint = sub.endpoint;
       lsSet("pushOn:" + ME, "1");
       P.msg = "Notifications are on for this player on this phone. Send a test to check.";
     } catch (e) {
-      P.msg = e && e.code === "wrong_code" ? "That code no longer works. Unlock goal editing again first." : "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
+      P.msg = "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
     } finally { P.busy = false; render(); }
   }
   async function pushOff() {
@@ -1817,7 +1848,7 @@ button:active { transform: scale(0.97); }
     const P = S.push;
     if (P.busy || !P.endpoint) return;
     P.busy = true; P.msg = ""; render();
-    try { await callFn({ action: "push_test", code: S.ownerCode, endpoint: P.endpoint }); P.msg = "Test sent. It should arrive in a few seconds."; }
+    try { await callFn({ action: "push_test", endpoint: P.endpoint }); P.msg = "Test sent. It should arrive in a few seconds."; }
     catch (e) { P.msg = e && e.code === "not_subscribed" ? "This device isn't registered any more. Turn notifications off and on again." : "The test didn't go through: " + String((e && e.message) || e).slice(0, 120); }
     finally { P.busy = false; render(); }
   }
@@ -1826,8 +1857,8 @@ button:active { transform: scale(0.97); }
     P.prefs[k] = P.prefs[k] === false;
     lsSet("pushPrefs:" + ME, JSON.stringify(P.prefs));
     render();
-    if (P.endpoint && S.ownerCode) {
-      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); }
+    if (P.endpoint) {
+      try { await callFn({ action: "push_prefs", endpoint: P.endpoint, prefs: pushPrefsOut() }); }
       catch (e) { P.prefs[k] = !P.prefs[k]; P.msg = "Couldn't save that setting. Try again."; render(); }
     }
   }
@@ -1837,12 +1868,134 @@ button:active { transform: scale(0.97); }
     P.prefs.recap_at = v; P.msg = "";
     lsSet("pushPrefs:" + ME, JSON.stringify(P.prefs));
     render();
-    if (P.endpoint && S.ownerCode) {
-      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); P.msg = "Daily recap set for " + clock(v) + "."; }
+    if (P.endpoint) {
+      try { await callFn({ action: "push_prefs", endpoint: P.endpoint, prefs: pushPrefsOut() }); P.msg = "Daily recap set for " + clock(v) + "."; }
       catch (e) { P.prefs.recap_at = before; P.msg = "Couldn't save the recap time. Try again."; }
       render();
     }
   }
+
+  // ---------- your phones ----------
+  // Goals and alerts live with this phone. A one-time 6-digit code lets another phone share them. On iPhone the
+  // Home Screen app keeps its own storage, so it counts as another phone too.
+  function linkCard() {
+    const L = S.link;
+    let inner;
+    if (L.code && L.until > Date.now()) {
+      inner = '<div class="lcode" aria-label="Code ' + L.code.split("").join(" ") + '"><span>' + L.code.slice(0, 3) + "</span><span>" + L.code.slice(3) + "</span></div>" +
+        '<div class="sub">On the other phone, open any player\'s Goals tab, tap <b>I have a code</b> and type this in. It works once, until ' +
+          esc(new Date(L.until).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })) + ".</div>" +
+        '<div class="row mt"><button class="btn ghost" data-link="hide">Done</button></div>';
+    } else if (L.enter) {
+      inner = '<form id="linkForm" class="row" novalidate><input class="input code-in" id="linkIn" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123 456" aria-label="6-digit code" value="' + esc(L.val || "") + '" style="flex:1;min-width:140px"' + (L.busy ? " disabled" : "") + '>' +
+          '<button class="btn" type="submit"' + (L.busy ? " disabled" : "") + ">" + (L.busy ? "Linking…" : "Link") + "</button></form>" +
+        '<div class="sub mt">Type the code showing on your other phone. This phone will then share its goals and alerts, and keep any it already has.</div>' +
+        '<div class="row mt"><button class="link" data-link="cancel">Cancel</button></div>';
+    } else {
+      inner = '<div class="sub">Your goals and alert settings are saved privately for this phone. No account or password, and nobody else can see or change them.</div>' +
+        '<div class="row mt"><button class="btn ghost" data-link="make"' + (L.busy ? " disabled" : "") + ">" + (L.busy ? "Making a code…" : "Use on another phone") + '</button><button class="link" data-link="enter">I have a code</button></div>' +
+        (S.push.ios ? '<div class="sub mt">On iPhone, the Home Screen app keeps its own copy. Link it the same way.</div>' : "");
+    }
+    return '<div class="card" id="linkCard"><h2>Your phones</h2>' + inner + (L.msg ? '<div class="sub mt" role="status">' + esc(L.msg) + "</div>" : "") + "</div>";
+  }
+  async function linkMake() {
+    const L = S.link;
+    if (L.busy) return;
+    L.busy = true; L.msg = ""; render();
+    try {
+      const r = await callFn({ action: "link_create" });
+      L.code = r.code; L.until = Date.parse(r.expires_at);
+      clearTimeout(L.timer);
+      L.timer = setTimeout(() => { if (S.link.code === r.code) { S.link.code = null; S.link.msg = "That code has expired. Make a new one if you still need it."; render(); } }, Math.max(0, L.until - Date.now()));
+    } catch (e) { L.msg = "Couldn't make a code: " + String((e && e.message) || e).slice(0, 120); }
+    finally { L.busy = false; render(); }
+  }
+  async function linkRedeem(raw) {
+    const L = S.link, code = String(raw || "").replace(/\D/g, "");
+    L.val = raw;
+    if (code.length !== 6) { L.msg = "Type all 6 digits."; render(); return; }
+    L.busy = true; L.msg = ""; render();
+    try {
+      await callFn({ action: "link_redeem", code });
+      L.enter = false; L.val = ""; L.msg = "Linked. This phone now shares goals and alerts with your other phone.";
+      S.goals = (await myGoals()).map(mapGoal); cacheSet();
+    } catch (e) {
+      L.msg = e.code === "bad_link" ? "That code isn't right or has expired. Check it, or make a new one on the other phone."
+        : e.code === "same_device" ? "That code was made on this phone. Type it on your other phone instead."
+        : "Couldn't link: " + String((e && e.message) || e).slice(0, 120);
+    } finally { L.busy = false; render(); }
+  }
+  // Phones that still remember a player's old code hand it in once, so the goals made with it move to this phone.
+  async function claimOldCodes() {
+    const tags = PROFILES.list().map((p) => p.tag).filter((t) => lsGet("code:" + t));
+    if (!tags.length) return;
+    let endpoint = null;
+    try {
+      const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(no, 3000))]);
+      const sub = await reg.pushManager.getSubscription(); endpoint = sub ? sub.endpoint : null;
+    } catch (e) {}
+    for (const t of tags) {
+      try {
+        const r = await callFn({ action: "claim_legacy", tag: t, code: lsGet("code:" + t), endpoint });
+        lsSet("code:" + t, null);
+        if (t === ME && r.goals) { S.goals = (await myGoals()).map(mapGoal); cacheSet(); render(); }
+      } catch (e) {} // tried again next time the app opens
+    }
+  }
+
+  // ---------- about: data and privacy ----------
+  const REPO = "https://github.com/boscolei1129-svg/brawl-stars-analytics";
+  let aboutFrom = null;
+  function showAbout() {
+    let el = $("#about");
+    if (!el) { el = document.createElement("div"); el.id = "about"; el.className = "tour about"; document.body.appendChild(el); }
+    el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "aboutT");
+    const sec = (t, items) => '<section class="ab-sec"><h3>' + t + "</h3><ul>" + items.map((i) => "<li>" + i + "</li>").join("") + "</ul></section>";
+    el.innerHTML = '<div class="tour-back" data-about="close"></div><div class="tour-sheet" id="aboutSheet" tabindex="-1"><div class="tour-grab" aria-hidden="true"></div>' +
+      '<div class="tour-top"><span class="tour-k">About</span><button class="link tour-skip" data-about="close">Close</button></div>' +
+      '<h2 class="tour-t" id="aboutT">Your data, plainly</h2>' +
+      '<p class="tour-b">Brawl Stats is a free fan-made app. It isn\'t affiliated with, endorsed, sponsored or approved by Supercell. Brawl Stars names and art belong to Supercell and are used under its <a href="https://supercell.com/en/fan-content-policy/" target="_blank" rel="noopener">Fan Content Policy</a>.</p>' +
+      sec("Where the numbers come from", [
+        "<b>Live:</b> trophies, brawlers and club members come from the official Brawl Stars API (through RoyaleAPI\'s proxy) and from BrawlTime. Club lists can trail the game by up to an hour.",
+        "<b>Saved history:</b> a reading every 15 minutes, starting the day a player is added here. Nothing before that exists, so charts start then.",
+        "<b>Battles:</b> the game only shares each player\'s last 25 battles. Win rates, modes and maps cover the battles the app has seen.",
+        "<b>Estimates:</b> the game doesn\'t say who\'s online. Club activity and play sessions are worked out from battle times, so they\'re estimates."]) +
+      sec("What\'s stored", [
+        "<b>For each tracked player:</b> their public game stats (tag, name, trophies, brawlers, battles and club). Anyone using the app can see them, as in the game.",
+        "<b>For this phone:</b> a random key made on this phone, your goals, your alert settings and the address your browser uses for notifications. Only this phone, and phones you link, can see or change them.",
+        "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this phone."]) +
+      sec("Keeping and removing", [
+        "Removing a player only takes it off this phone. Players nobody opens for 30 days stop being checked.",
+        "Turning notifications off deletes this phone\'s notification address for that player. Removing a goal deletes it.",
+        'To have a player\'s saved history deleted, contact the developer on <a href="' + REPO + '" target="_blank" rel="noopener">GitHub</a>.']) +
+      '<div class="tour-foot"><span class="tour-n">Unofficial fan app</span><div class="tour-btns"><button class="btn" data-about="close">Done</button></div></div></div>';
+    aboutFrom = document.activeElement;
+    document.documentElement.classList.add("homeopen");
+    setTimeout(() => { const s = $("#aboutSheet"); if (s) s.focus(); }, 0);
+  }
+  function closeAbout() {
+    const el = $("#about"); if (!el || el.classList.contains("leaving")) return;
+    el.classList.add("leaving");
+    setTimeout(() => {
+      el.remove();
+      if (!H.open && !$("#tour")) document.documentElement.classList.remove("homeopen");
+      if (aboutFrom && aboutFrom.focus) aboutFrom.focus();
+    }, REDUCED() ? 0 : 280);
+  }
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest && ev.target.closest("[data-about]");
+    if (a) { ev.preventDefault(); if (a.dataset.about === "open") showAbout(); else closeAbout(); return; }
+    const l = ev.target.closest && ev.target.closest("[data-link]");
+    if (!l) return;
+    const k = l.dataset.link, L = S.link;
+    if (k === "make") linkMake();
+    else if (k === "enter") { L.enter = true; L.msg = ""; render(); setTimeout(() => { const i = $("#linkIn"); if (i) i.focus(); }, 0); }
+    else if (k === "cancel") { L.enter = false; L.msg = ""; L.val = ""; render(); }
+    else if (k === "hide") { L.code = null; L.msg = ""; clearTimeout(L.timer); render(); }
+  });
+  document.addEventListener("submit", (ev) => { if (ev.target.id === "linkForm") { ev.preventDefault(); linkRedeem($("#linkIn").value); } });
+  document.addEventListener("input", (ev) => { if (ev.target.id === "linkIn") S.link.val = ev.target.value; });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && $("#about")) closeAbout(); });
 
   // ---------- render ----------
   const RENDER = { me: renderMe, club: renderClub, activity: renderActivity, brawlers: renderBrawlers, goals: renderGoals };
@@ -1971,24 +2124,22 @@ button:active { transform: scale(0.97); }
     addGoal(g);
   });
   async function reloadGoals() {
-    S.goals = (await rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc")).map(mapGoal);
+    S.goals = (await myGoals()).map(mapGoal);
     cacheSet();
   }
   async function goalCall(body) {
-    if (!S.ownerCode || S.goalBusy) return;
+    if (S.goalBusy) return;
     S.goalBusy = true;
     if (body.action === "goal_delete") S.goals = S.goals.filter((g) => g.id !== body.id);
     render();
     try {
-      await callFn(Object.assign({ code: S.ownerCode }, body));
+      await callFn(body);
       await reloadGoals();
       showBanner("");
     } catch (e) {
       try { await reloadGoals(); } catch (e2) {}
-      if (e.code === "wrong_code") {
-        S.ownerCode = null;
-        lsSet("code:" + ME, null);
-        showBanner("<b>That code no longer works.</b> Enter it again on the Goals tab.");
+      if (e.code === "too_many_goals") {
+        showBanner("<b>That's 25 goals for this player already.</b> Remove one to add another.");
       } else {
         showBanner("<b>Couldn't save that change.</b> " + esc(String((e && e.message) || e).slice(0, 140)));
       }
@@ -2108,10 +2259,10 @@ button:active { transform: scale(0.97); }
         "</section>" +
         (first ? '<section class="home-sec feats" aria-label="What the app tracks">' +
           feat('<path d="M2 12.5l3.5-4 3 2.5L14 4"/><path d="M10.5 4H14v3.5"/>', "Trophy history", "Saved every 15 minutes, even while the app is closed.") +
-          feat('<circle cx="5.5" cy="5.5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M1.8 13.5c.5-2.3 2-3.6 3.7-3.6s3.2 1.3 3.7 3.6M9.6 10.3c1.6-.4 3.6.4 4.4 3.2"/>', "Club board and activity", "Who's climbing, who's online, and when the club plays.") +
+          feat('<circle cx="5.5" cy="5.5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M1.8 13.5c.5-2.3 2-3.6 3.7-3.6s3.2 1.3 3.7 3.6M9.6 10.3c1.6-.4 3.6.4 4.4 3.2"/>', "Club board and activity", "Who's climbing, who's been playing, and when the club plays.") +
           feat('<path d="M4 7a4 4 0 0 1 8 0v3l1.3 2H2.7L4 10V7Z"/><path d="M6.6 14h2.8"/>', "Goals and alerts", "Targets with finish dates, milestones and a daily recap.") +
           "</section>" : "") +
-        '<p class="home-foot"><button class="link" data-tour="replay">How it works</button><span>Unofficial. Not affiliated with or endorsed by Supercell.</span></p>' +
+        '<p class="home-foot"><span class="hf-links"><button class="link" data-tour="replay">How it works</button><button class="link" data-about="open">Privacy and data</button></span><span>Unofficial. Not affiliated with or endorsed by Supercell.</span></p>' +
       "</div>";
   }
   const feat = (path, title, sub) => '<div class="feat"><span class="fi"><svg viewBox="0 0 16 16" aria-hidden="true">' + path + "</svg></span><span><b>" + title + "</b><small>" + sub + "</small></span></div>";
@@ -2163,12 +2314,9 @@ button:active { transform: scale(0.97); }
       (saved
         ? '<div class="pc-note">' + esc(pl.name) + ' is already saved on this phone.</div><button class="btn wide" data-home="open-look">Open ' + esc(pl.name) + "</button>"
         : L.tracked
-          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts need the code chosen when they were added.</div>" +
+          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts you set stay private to this phone.</div>" +
             '<div id="pvAction"></div>'
           : '<div class="pc-sec"><span class="pc-lbl" id="clubLbl">Club to follow</span><div id="pvClub"></div></div>' +
-            '<div class="pc-sec"><label class="pc-lbl" for="hCode">Code for goals and alerts</label>' +
-              '<input class="input code-in" id="hCode" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="12" aria-describedby="hCodeHint" value="' + esc(H.code) + '">' +
-              '<div class="hint" id="hCodeHint">4 to 12 letters or numbers. You\'ll need it to set goals or turn on alerts for this player, on any phone. It can\'t be reset, so keep it somewhere safe.</div></div>' +
             '<div id="pvAction"></div>') +
       "</div>";
     if (!saved) { paintClub(); paintAction(); }
@@ -2199,7 +2347,6 @@ button:active { transform: scale(0.97); }
   const readyToAdd = () => {
     const L = H.look; if (!L) return false;
     if (L.tracked) return true;
-    if (!CODE_RE.test(H.code.trim())) return false;
     return H.clubMode !== "other" || !!H.clubLook;
   };
   function paintAction() {
@@ -2209,6 +2356,7 @@ button:active { transform: scale(0.97); }
       return;
     }
     box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this phone" : "Start tracking") + "</button>" +
+      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this phone.</div>" +
       (H.err ? '<div class="pv-err" role="alert">' + esc(H.err) + "</div>" : "");
   }
   let lookT = null, lookSeq = 0, clubT = null, clubSeq = 0;
@@ -2259,7 +2407,6 @@ button:active { transform: scale(0.97); }
     if (!L || H.busy || !readyToAdd()) return;
     const tag = L.player.tag, body = { action: "profile_add", tag };
     if (!L.tracked) {
-      body.code = H.code.trim().toUpperCase();
       if (H.clubMode === "none") body.club = "";
       else if (H.clubMode === "other") body.club = H.clubLook.tag;
     }
@@ -2267,12 +2414,10 @@ button:active { transform: scale(0.97); }
     try {
       const r = await callFn(body);
       PROFILES.upsert(cardOf(r.profile));
-      if (body.code) lsSet("code:" + tag, body.code); // whoever added it can set goals straight away
       openProfile(tag);
     } catch (e) {
       H.busy = false;
-      H.err = e.code === "full" ? "The app is already tracking its limit of 20 players, so it can't add more right now."
-        : e.code === "bad_code" ? "The code needs 4 to 12 letters or numbers."
+      H.err = e.code === "full" ? "The app is following as many players as it can right now (20). Players nobody opens for 30 days are paused, which frees up space."
         : e.code === "player_not_found" ? "Brawl Stars couldn't find that player just now. Try again."
         : e.code === "club_not_found" ? "Brawl Stars couldn't find that club just now. Try again."
         : "Couldn't add the player: " + String((e && e.message) || e).slice(0, 120);
@@ -2381,7 +2526,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         <circle class="dot" cx="252" cy="38" r="5"/><circle class="ping" cx="252" cy="38" r="5"/>
         <g class="chip"><rect x="196" y="6" width="58" height="22"/><text x="225" y="21">+126</text></g></svg>` },
     { k: "Your club", t: "See your club live",
-      b: "The member board shows who's climbing, and the activity tab shows who's playing right now, with a 24-hour timeline of when everyone plays.",
+      b: "The member board shows who's climbing. Activity shows who has played recently and a 24-hour timeline of when everyone plays, worked out from battles because the game doesn't share who's online.",
       art: `<svg class="art-club" viewBox="0 0 280 150" aria-hidden="true">
         ${[0, 1, 2, 3].map((i) => `<g class="row r${i}" transform="translate(0 ${12 + i * 34})">
           <rect class="av" x="8" y="0" width="22" height="22"/>${i === 1 ? '<circle class="on" cx="38" cy="11" r="3.5"/>' : ""}
@@ -2398,12 +2543,12 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         <g class="note"><rect x="128" y="18" width="144" height="46"/><rect class="nicon" x="138" y="29" width="24" height="24"/><text class="nemo" x="150" y="46">🎯</text>
           <text class="nt" x="170" y="38">Goal reached</text><text class="ns" x="170" y="54">50,000 trophies</text></g>
         <g class="bell" transform="translate(196 104)"><path d="M-12 6a12 12 0 0 1 24 0v8l4 5h-32l4-5Z"/><path d="M-4 23h8"/></g></svg>` },
-    { k: "Codes", t: "One code guards each player",
-      rows: [["eye", "Anyone can look", "Brawl Stars stats are public, so anyone with the app can view any player."],
-        ["key", "The code unlocks changes", "Whoever adds a player picks a code of 4 to 12 letters or numbers. It's needed to set goals or turn on alerts for that player, on any phone. Each phone remembers it once entered."],
-        ["shield", "Keep it safe", "Codes can't be reset, so write yours down somewhere."]],
+    { k: "Private", t: "Your goals stay yours",
+      rows: [["eye", "Anyone can look", "Brawl Stars stats are public, so anyone with the app can follow any player."],
+        ["key", "No account, no password", "Goals and alert settings are saved privately for this phone. Nobody else can see or change them."],
+        ["shield", "Got another phone?", "On the Goals tab, tap Use on another phone for a one-time 6-digit code."]],
       art: `<svg class="art-code" viewBox="0 0 280 150" aria-hidden="true">
-        ${["N", "O", "V", "A"].map((c, i) => `<g class="cap" style="animation-delay:${0.15 + i * 0.18}s" transform="translate(${22 + i * 46} 52)"><rect width="38" height="46"/><text x="19" y="31">${c}</text></g>`).join("")}
+        ${["4", "8", "2", "9", "1", "3"].map((c, i) => `<g class="cap" style="animation-delay:${0.15 + i * 0.12}s" transform="translate(${6 + i * 33 + (i > 2 ? 10 : 0)} 54)"><rect width="29" height="42"/><text x="14.5" y="29">${c}</text></g>`).join("")}
         <g class="lock" transform="translate(234 75)"><path class="shackle" d="M-9 -4v-8a9 9 0 0 1 18 0v8"/><rect x="-14" y="-4" width="28" height="24"/><circle cx="0" cy="8" r="3"/></g></svg>` },
   ];
   const T = { i: 0, dir: 1, replay: false };
@@ -2495,7 +2640,8 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const card = PROFILES.list().find((p) => p.tag === ME) || {};
     $("#hName").textContent = card.name || "#" + ME;
     $("#hSub").textContent = "Player // #" + ME;
-    S.ownerCode = lsGet("code:" + ME);
+    S.ownerCode = null;
+    setTimeout(claimOldCodes, 0);
     const cached = await cacheGet();
     if (cached && cached.v === CACHE_V && Array.isArray(cached.readings) && cached.readings.length) {
       S.readings = cached.readings; S.battleRows = cached.battleRows || []; S.goals = cached.goals || []; S.sessions = cached.sessions || [];

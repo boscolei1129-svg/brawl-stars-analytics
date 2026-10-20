@@ -27,7 +27,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const saved = await cache.match(key);
-    const fresh = fetch(req).then((res) => {
+    // The page itself is always re-checked with the server (not the browser's 10-minute cache), so a new
+    // version is ready by the next open.
+    const isPage = key === new URL("./", self.registration.scope).href;
+    const fresh = fetch(isPage ? new Request(url.href, { cache: "no-cache", credentials: "same-origin" }) : req).then((res) => {
       if (res.ok && res.type === "basic") cache.put(key, res.clone()).catch(() => {});
       return res;
     });

@@ -13,7 +13,7 @@ A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Starga
   - `readings`: one row per update.
   - `battles`: one row per battle, keyed by time.
   - `goals`.
-  - `settings`: holds only a hash of the owner code.
+  - `settings`: private. It holds the owner-code hash and the current full brawler list.
 
   Anyone can read the first three. Only the function can write to any of them.
 

@@ -88,8 +88,8 @@ const TAG = "8YRJ090Q2";
   r = await call({ action: "profile_lookup", tag: "2PPLYQ2C" }, "203.0.113.50", { "x-forwarded-for": "9.9.9.9" });
   ok("a forged X-Forwarded-For doesn't dodge the limit (the gateway's own address header wins)", r.status === 429, r.status);
   const adds = [];
-  for (const t of ["2PP", "2PY", "2PL", "2PQ", "2PG", "2PR", "2PJ"]) adds.push((await call({ action: "profile_add", tag: t }, "203.0.113.60")).status);
-  ok("7th new player from one address in an hour is refused", adds.slice(0, 6).every((s) => s === 200) && adds[6] === 429, adds);
+  for (const t of ["2PP", "2PY", "2PL", "2PQ", "2PG", "2PR", "2PJ"]) adds.push((await call({ action: "profile_add", tag: t, device: dev() }, "203.0.113.60")).status);
+  ok("7th new player from one address in an hour is refused (even from different phones)", adds.slice(0, 6).every((s) => s === 200) && adds[6] === 429, adds);
   ok("re-adding an already tracked player isn't limited", (await call({ action: "profile_add", tag: "2PP" }, "203.0.113.60")).exists === true);
   ok("recap can't be triggered twice in a row", (await call({ action: "recap" })).ok && (await call({ action: "recap" })).skipped === true);
 

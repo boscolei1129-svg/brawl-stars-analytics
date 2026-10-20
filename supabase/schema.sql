@@ -220,3 +220,14 @@ grant execute on function public.rate_hit(text, integer, integer) to service_rol
 
 -- The public key only ever reads (and RLS decides what); the function writes with its own key.
 revoke insert, update, delete, truncate, references, trigger on all tables in schema public from anon, authenticated;
+
+-- Which phone (device owner) started tracking which player. Each owner can hold 2 active players; the app holds 50.
+create table if not exists public.profile_adders (
+  owner uuid not null,
+  tag text not null references public.profiles(tag) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (owner, tag)
+);
+create index if not exists profile_adders_tag_idx on public.profile_adders (tag);
+alter table public.profile_adders enable row level security;
+revoke all on public.profile_adders from anon, authenticated;

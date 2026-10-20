@@ -5,8 +5,8 @@ const { transformSync } = require("esbuild");
 const crypto = require("crypto");
 
 function makeDb() {
-  const T = { profiles: [], profile_codes: [], readings: [], battles: [], goals: [], sessions: [], settings: [], push_subs: [], device_keys: [], device_links: [], rate_hits: [] };
-  const PK = { profiles: ["tag"], profile_codes: ["tag"], settings: ["key"], push_subs: ["endpoint", "tag"], device_keys: ["key_hash"], device_links: ["code_hash"], goals: ["id"], battles: ["tag", "t"] };
+  const T = { profiles: [], profile_codes: [], readings: [], battles: [], goals: [], sessions: [], settings: [], push_subs: [], device_keys: [], device_links: [], rate_hits: [], profile_adders: [] };
+  const PK = { profiles: ["tag"], profile_codes: ["tag"], settings: ["key"], push_subs: ["endpoint", "tag"], device_keys: ["key_hash"], device_links: ["code_hash"], profile_adders: ["owner", "tag"], goals: ["id"], battles: ["tag", "t"] };
   const clock = { now: () => Date.now() };
   const cmp = (a, b) => (a == null && b == null ? 0 : a == null ? -1 : b == null ? 1 : a < b ? -1 : a > b ? 1 : 0);
   const val = (v) => (typeof v === "string" && /^\d{4}-\d\d-\d\dT/.test(v) ? Date.parse(v) : v);
@@ -43,6 +43,7 @@ function makeDb() {
         for (const raw of this.rows) {
           const r = { ...raw };
           if (this.t === "goals" && !r.id) { r.id = crypto.randomUUID(); r.created_at = r.created_at || new Date(clock.now()).toISOString(); }
+          if (this.t === "profiles" && this.op === "insert") { r.active ??= true; r.keep ??= false; r.follow ??= true; r.created_at ??= new Date(clock.now()).toISOString(); r.last_open_at ??= r.created_at; }
           if (this.t === "device_keys") { r.created_at ??= new Date(clock.now()).toISOString(); r.last_seen_at ??= r.created_at; }
           const key = this.op === "upsert" ? this.conflict : PK[this.t];
           const hit = key ? rows.find((x) => key.every((k) => x[k] === r[k])) : null;
@@ -92,7 +93,7 @@ function load(file, { player } = {}) {
   let src = fs.readFileSync(file, "utf8")
     .replace(/^import \{ createClient \} from .*$/m, "const { createClient } = __mock;")
     .replace(/^import webpush from .*$/m, "const webpush = __webpush;");
-  const js = transformSync(src + "\nglobalThis.__internals = { checkEvents, notify };", { loader: "ts", format: "cjs" }).code;
+  const js = transformSync(src + "\nglobalThis.__internals = { checkEvents, notify, thinReadings, foldDay, applyClub };", { loader: "ts", format: "cjs" }).code;
   let handler = null;
   const env = { SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_ROLE_KEY: "svc", BS_API_KEY: "k" };
   const Deno = { env: { get: (k) => env[k] }, serve: (h) => { handler = h; } };

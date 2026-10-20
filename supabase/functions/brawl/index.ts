@@ -1,7 +1,8 @@
 // Brawl Stars Analytics server function. Every profile is a player tag (plus the club it follows);
 // requests name it with `tag` (no #). Requests without one mean the original profile, LEGACY.
 //   POST {action:"profile_lookup", tag, club?}     check a player (and club) before adding: name, icon, trophies
-//   POST {action:"profile_add", tag, club?}        start tracking a new profile (anyone can; game stats are public)
+//   POST {action:"profile_add", tag, device, club?}  start tracking a new profile (game stats are public); each device can start PER_DEVICE
+//   POST {action:"profile_release", tag, device}   this device no longer holds the profile it started (it pauses when nobody holds it)
 //   POST {action:"refresh", tag, src?:"auto"|"live"}  fetch fresh stats, save a reading and new battles
 // Goals and alerts are private to a device. Each device sends `device`, a random secret it made itself; devices
 // linked with a one-time code share one owner. Nobody else can see or change them.
@@ -19,7 +20,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 const LEGACY = "8YRJ090Q2"; // the first profile; requests without a tag mean this one
-const MAX_PROFILES = 20; // profiles tracked at once (each one's club is read every 15 minutes)
+const MAX_PROFILES = 50; // profiles tracked at once (each one's club is read every 15 minutes)
+const PER_DEVICE = 2; // active profiles one device (and the devices linked to it) can have started
+const THIN_AFTER_DAYS = 30; // older readings are folded into one per day
+const KEEP_BATTLES_DAYS = 365; // battles and play sessions older than this are deleted
 // Player and club tags only use these characters. People often type O for 0.
 const TAG_RE = /^[0289PYLQGRJCUV]{3,14}$/;
 const normTag = (t: unknown) => String(t ?? "").toUpperCase().replace(/[\s#]/g, "").replace(/O/g, "0");
@@ -240,7 +244,11 @@ async function getProfile(tag: string): Promise<Profile | null> {
 async function refresh(src: string, p: Profile) {
   const me = p.tag;
   // Opening a profile keeps it on the schedule (and wakes it up if it had paused).
-  if (src === "live") await sb.from("profiles").update({ last_open_at: new Date().toISOString(), active: true }).eq("tag", me);
+  if (src === "live") {
+    const open: Record<string, unknown> = { last_open_at: new Date().toISOString() };
+    if (p.active === false && (await activeCount()) < MAX_PROFILES) open.active = true;
+    await sb.from("profiles").update(open).eq("tag", me);
+  }
   const { data: lastRows, error: lastErr } = await sb.from("readings")
     .select("id, ts, checked, nb, trophies, club_trophies, player").eq("tag", me)
     .order("ts", { ascending: false }).order("id", { ascending: false }).limit(1);
@@ -769,6 +777,108 @@ async function lookup(tag: string, clubArg: unknown) {
   }
   return { player: { tag, name: pl.name, icon: pl.icon?.id ?? null, trophies: pl.trophies ?? null, club: own }, club };
 }
+// ---------- thinning old readings ----------
+// Readings mostly hold changes (brawlers and club members that moved), which the app adds up in order. A day older
+// than THIN_AFTER_DAYS is folded into its last reading: that reading gets the day's changes added together (or the
+// club list in full, if it was saved in full that day) and the newest player stats, then the rest are deleted.
+// Adding up the folded readings gives exactly the same end-of-day state, and a fold that stops halfway is harmless:
+// applying the same changes twice changes nothing. Battles are separate, so trophy charts keep every battle.
+const dayKey = (t: unknown) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(String(t)));
+function foldClub(acc: any, c: any) {
+  if (!c) return acc;
+  if (!c.d) return structuredClone(c);
+  if (!acc) return { d: 1, trophies: c.trophies, upd: (c.upd ?? []).map((u: any[]) => u.slice()) };
+  if (!acc.d) return applyClub(acc, c);
+  const m = new Map((acc.upd ?? []).map((u: any[]) => [u[0], u[1]]));
+  for (const u of c.upd ?? []) m.set(u[0], u[1]);
+  return { d: 1, trophies: c.trophies, upd: [...m].map(([k, v]) => [k, v]) };
+}
+// The changes to make to the day's last reading (rows in saved order).
+function foldDay(rows: any[]) {
+  let brawlers: Record<string, unknown> | null = null, club: any = null, best: any = null, clubTr: number | null = null;
+  for (const r of rows) {
+    if (r.brawlers) brawlers = { ...(brawlers ?? {}), ...r.brawlers };
+    club = foldClub(club, r.club ?? r.club_upd);
+    if (r.player && (!best || ms(r.nb) >= ms(best.nb))) best = r;
+    if (r.club_trophies != null) clubTr = r.club_trophies;
+  }
+  const patch: Record<string, unknown> = {};
+  if (brawlers) patch.brawlers = brawlers;
+  if (club) { if (club.d) Object.assign(patch, { club_upd: club, club: null }); else Object.assign(patch, { club, club_upd: null }); }
+  if (best) Object.assign(patch, { player: best.player, trophies: best.trophies, nb: best.nb });
+  if (clubTr != null) patch.club_trophies = clubTr;
+  return patch;
+}
+async function thinReadings(budget = 60) {
+  const cutoff = new Date(Date.now() - THIN_AFTER_DAYS * 86_400_000).toISOString(), cutDay = dayKey(cutoff);
+  const { data: profs, error } = await sb.from("profiles").select("tag");
+  if (error) throw error;
+  let days = 0, removed = 0;
+  for (const { tag } of profs ?? []) {
+    if (days >= budget) break;
+    const mark = "thin_upto:" + tag, from = (await getSetting(mark)) ?? "1970-01-01T00:00:00Z";
+    const LIM = 3000;
+    const { data: rows, error: e1 } = await sb.from("readings").select("id, ts, nb, trophies, club_trophies, player, brawlers, club, club_upd")
+      .eq("tag", tag).gt("ts", from).lt("ts", cutoff).order("ts", { ascending: true }).order("id", { ascending: true }).limit(LIM);
+    if (e1) throw e1;
+    const groups: any[][] = [];
+    for (const r of rows ?? []) {
+      const k = dayKey(r.ts);
+      if (k >= cutDay) break; // the day the cutoff falls in waits until it's wholly past
+      if (!groups.length || dayKey(groups[groups.length - 1][0].ts) !== k) groups.push([]);
+      groups[groups.length - 1].push(r);
+    }
+    if ((rows?.length ?? 0) >= LIM && groups.length > 1) groups.pop(); // the last day may be cut short
+    let upto: string | null = null;
+    for (const g of groups) {
+      if (days >= budget) break;
+      const keep = g[g.length - 1];
+      if (g.length > 1) {
+        const { error: e2 } = await sb.from("readings").update(foldDay(g)).eq("id", keep.id);
+        if (e2) throw e2;
+        const ids = g.slice(0, -1).map((r) => r.id);
+        for (let i = 0; i < ids.length; i += 300) {
+          const { error: e3 } = await sb.from("readings").delete().in("id", ids.slice(i, i + 300));
+          if (e3) throw e3;
+        }
+        removed += ids.length; days++;
+      }
+      upto = keep.ts;
+    }
+    if (upto) {
+      const { error: e4 } = await sb.from("settings").upsert({ key: mark, value: upto }, { onConflict: "key" });
+      if (e4) throw e4;
+    }
+  }
+  return { days, removed };
+}
+
+async function activeCount() {
+  const { count, error } = await sb.from("profiles").select("tag", { count: "exact", head: true }).eq("active", true);
+  if (error) throw error;
+  return count ?? 0;
+}
+// The active profiles a device's owner started (they count towards PER_DEVICE).
+async function heldBy(owner: string): Promise<string[]> {
+  const { data, error } = await sb.from("profile_adders").select("tag").eq("owner", owner);
+  if (error) throw error;
+  const tags = (data ?? []).map((r: any) => r.tag);
+  if (!tags.length) return [];
+  const { data: act, error: e2 } = await sb.from("profiles").select("tag").in("tag", tags).eq("active", true);
+  if (e2) throw e2;
+  return (act ?? []).map((r: any) => r.tag);
+}
+// Room for one more active profile, started by this owner. Returns an error response, or null when there's room.
+async function roomFor(owner: string) {
+  if ((await activeCount()) >= MAX_PROFILES) return fail("full", 409);
+  const held = await heldBy(owner);
+  if (held.length >= PER_DEVICE) return json({ ok: false, error: "phone_full", held }, 409);
+  return null;
+}
+async function hold(owner: string, tag: string) {
+  const { error } = await sb.from("profile_adders").upsert({ owner, tag }, { onConflict: "owner,tag" });
+  if (error) throw error;
+}
 const publicProfile = (p: any) => ({ tag: p.tag, club: p.club, name: p.name, icon: p.icon, trophies: p.trophies, club_name: p.club_name, club_badge: p.club_badge ?? null });
 const fail = (error: string, status = 400) => json({ ok: false, error }, status);
 
@@ -795,14 +905,24 @@ Deno.serve(async (req) => {
           // other club (or none) goes back to following the player's own club when anyone adds it that way, and
           // can't be pointed away from it again, so nobody can spoil a player's profile for everyone else.
           const patch: Record<string, unknown> = {};
-          if (!existing.active) Object.assign(patch, { active: true, last_open_at: new Date().toISOString() });
+          if (!existing.active) {
+            // Paused: starting it up again takes a spot, like adding a new player.
+            const owner = await ownerOf(body.device, ip, true);
+            if (!owner) return fail("no_device", 401);
+            const full = await roomFor(owner);
+            if (full) return full;
+            await hold(owner, tag);
+            Object.assign(patch, { active: true, last_open_at: new Date().toISOString() });
+          }
           if (!existing.follow && body.club === undefined) patch.follow = true;
           if (Object.keys(patch).length) await sb.from("profiles").update(patch).eq("tag", tag);
           return json({ ok: true, exists: true, profile: publicProfile({ ...existing, ...patch }) });
         }
+        const owner = await ownerOf(body.device, ip, true);
+        if (!owner) return fail("no_device", 401);
         await limit("add:" + ip, 3600, 6);
-        const { count } = await sb.from("profiles").select("tag", { count: "exact", head: true }).eq("active", true);
-        if ((count ?? 0) >= MAX_PROFILES) return fail("full", 409);
+        const full = await roomFor(owner);
+        if (full) return full;
         const found = await lookup(tag, body.club);
         // Left to the player's own club (or none), the profile keeps following them if they move.
         const follow = body.club === undefined || !!found.club?.own || (!found.club && !found.player.club);
@@ -810,10 +930,27 @@ Deno.serve(async (req) => {
           club_name: found.club?.name ?? null, club_badge: found.club?.badge ?? null, follow };
         const { error } = await sb.from("profiles").insert(row);
         if (error) { if (error.code === "23505") return json({ ok: true, exists: true, profile: row }); throw error; }
+        await hold(owner, tag);
         // First reading now, so the dashboard has something to show straight away.
         let first: unknown = null;
         try { first = await refresh("live", row); } catch (e) { first = { error: String((e as Error)?.message ?? e) }; }
         return json({ ok: true, created: true, profile: publicProfile((await getProfile(tag)) ?? row), first });
+      }
+      case "profile_release": {
+        // Removed from a device's list. If that device started it and no other device did, it pauses (history kept).
+        const owner = await ownerOf(body.device, ip, false);
+        if (!owner || !TAG_RE.test(tag)) return json({ ok: true, released: false });
+        await limit("rel:" + ip, 3600, 60);
+        const { count, error } = await sb.from("profile_adders").delete({ count: "exact" }).eq("owner", owner).eq("tag", tag);
+        if (error) throw error;
+        if (!count) return json({ ok: true, released: false });
+        const { count: others } = await sb.from("profile_adders").select("owner", { count: "exact", head: true }).eq("tag", tag);
+        let paused = false;
+        if (!others) {
+          const { data } = await sb.from("profiles").update({ active: false }).eq("tag", tag).eq("active", true).eq("keep", false).select("tag");
+          paused = !!data?.length;
+        }
+        return json({ ok: true, released: true, paused });
       }
       case "refresh": {
         const p = await getProfile(tag);
@@ -888,6 +1025,10 @@ Deno.serve(async (req) => {
           const g = await sb.from("goals").update({ owner: link.owner }, { count: "exact" }).eq("owner", mine.owner);
           moved = g.count ?? 0;
           await sb.from("push_subs").update({ owner: link.owner }).eq("owner", mine.owner);
+          // Players this device started move too (linked devices share one limit).
+          const { data: held } = await sb.from("profile_adders").select("tag").eq("owner", mine.owner);
+          for (const h of held ?? []) await hold(link.owner, h.tag);
+          await sb.from("profile_adders").delete().eq("owner", mine.owner);
           await sb.from("device_keys").update({ owner: link.owner }).eq("owner", mine.owner);
         } else {
           const { error } = await sb.from("device_keys").insert({ key_hash, owner: link.owner });
@@ -966,6 +1107,11 @@ Deno.serve(async (req) => {
           // Once an hour: drop old abuse counters and expired link codes.
           await sb.from("rate_hits").delete().lt("at", new Date(Date.now() - 2 * 86_400_000).toISOString());
           await sb.from("device_links").delete().lt("expires_at", new Date().toISOString());
+          const old = new Date(Date.now() - KEEP_BATTLES_DAYS * 86_400_000).toISOString();
+          await sb.from("battles").delete().lt("t", old);
+          await sb.from("sessions").delete().lt("ended_at", old);
+          // Old readings are folded a limited number of days at a time, so a run never takes long.
+          try { (out as any).thinned = await thinReadings(); } catch (e) { console.error("thin", (e as Error)?.message ?? e); }
         }
         return json(out);
       }

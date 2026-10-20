@@ -879,6 +879,7 @@ button:active { transform: scale(0.97); }
     if (!r.ok || !j || j.ok === false && body.action !== "check_code") {
       const err = new Error(r.status === 429 ? "Too many requests from this network. Wait a few minutes and try again." : (j && j.error) || "The server answered " + r.status);
       err.code = j && j.error;
+      err.data = j;
       throw err;
     }
     return j;
@@ -1958,6 +1959,7 @@ button:active { transform: scale(0.97); }
       sec("Where the numbers come from", [
         "<b>Live:</b> trophies, brawlers and club members come from the official Brawl Stars API (through RoyaleAPI\'s proxy) and from BrawlTime. Club lists can trail the game by up to an hour.",
         "<b>Saved history:</b> a reading every 15 minutes, starting the day a player is added here. Nothing before that exists, so charts start then.",
+        "<b>Older history:</b> after 30 days, each day is kept as one reading (how things stood at the end of that day). Battles are kept for a year.",
         "<b>Battles:</b> the game only shares each player\'s last 25 battles. Win rates, modes and maps cover the battles the app has seen.",
         "<b>Estimates:</b> the game doesn\'t say who\'s online. Club activity and play sessions are worked out from battle times, so they\'re estimates."]) +
       sec("What\'s stored", [
@@ -1966,7 +1968,8 @@ button:active { transform: scale(0.97); }
         "To stop abuse, the server counts requests from each network address. The counts are scrambled and deleted within two days.",
         "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this phone."]) +
       sec("Keeping and removing", [
-        "Removing a player only takes it off this phone. Players nobody opens for 30 days stop being checked.",
+        "Each phone can start tracking 2 players (50 across the app). Removing a player you started frees your spot; if no other phone started them, they pause and their history is kept.",
+        "Players nobody opens for 30 days stop being checked. Opening one again starts it back up when there\'s room.",
         "Turning notifications off deletes this phone\'s notification address for that player. Removing a goal deletes it.",
         'To have a player\'s saved history deleted, contact the developer on <a href="' + REPO + '" target="_blank" rel="noopener">GitHub</a>.']) +
       '<div class="tour-foot"><span class="tour-n">Unofficial fan app</span><div class="tour-btns"><button class="btn" data-about="close">Done</button></div></div></div>';
@@ -2357,7 +2360,7 @@ button:active { transform: scale(0.97); }
       return;
     }
     box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this phone" : "Start tracking") + "</button>" +
-      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this phone.</div>" +
+      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this phone." + (L.tracked ? "" : " Each phone can start tracking 2 players.") + "</div>" +
       (H.err ? '<div class="pv-err" role="alert">' + esc(H.err) + "</div>" : "");
   }
   let lookT = null, lookSeq = 0, clubT = null, clubSeq = 0;
@@ -2418,12 +2421,19 @@ button:active { transform: scale(0.97); }
       openProfile(tag);
     } catch (e) {
       H.busy = false;
-      H.err = e.code === "full" ? "The app is following as many players as it can right now (20). Players nobody opens for 30 days are paused, which frees up space."
+      H.err = e.code === "full" ? "The app is following as many players as it can right now (50). Players nobody opens for 30 days pause, which frees up space, so try again later."
+        : e.code === "phone_full" ? phoneFullMsg((e.data && e.data.held) || [])
         : e.code === "player_not_found" ? "Brawl Stars couldn't find that player just now. Try again."
         : e.code === "club_not_found" ? "Brawl Stars couldn't find that club just now. Try again."
         : "Couldn't add the player: " + String((e && e.message) || e).slice(0, 120);
       paintAction(); if (!L.tracked) paintClub();
     }
+  }
+  // Each phone can start tracking 2 players. Saving a player someone else already tracks doesn't count.
+  function phoneFullMsg(held) {
+    const names = held.map((t) => { const p = PROFILES.list().find((x) => x.tag === t); return p && p.name ? p.name : "#" + t; });
+    return "Each phone can start tracking 2 players" + (names.length ? ", and this one is tracking " + names.join(" and ") : "") +
+      ". Remove one of them from your list to add someone new.";
   }
   function openProfile(tag) {
     PROFILES.setCurrent(tag);
@@ -2444,6 +2454,7 @@ button:active { transform: scale(0.97); }
     }
     ["code:", "pushPrefs:", "pushOn:"].forEach((k) => lsSet(k + tag, null));
     idb("readwrite", (st) => st.delete("data:" + tag)).catch(() => {});
+    callFn({ action: "profile_release", tag }).catch(() => {});
     PROFILES.remove(tag);
     if (tag === ME) PROFILES.setCurrent(null);
     if (!PROFILES.list().length) { H.edit = false; showHome(); return; }

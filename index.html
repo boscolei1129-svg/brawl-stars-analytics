@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brawl Stars Analytics</title>
+<meta name="description" content="Trophies, battles, brawlers and club stats for bboscox and Stargazers.">
+<meta name="theme-color" content="#0c0e11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brawl Stats">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: esports HUD. One phone-width column of hard-edged panels, sticky status bar, text tab bar with an orange rail. */
+:root {
+  color-scheme: dark;
+  --bg: #0c0e11;
+  --surface: #14171c;
+  --raise: #1b1f26;
+  --line: #2a2f38;
+  --line-2: #22272f;
+  --fg: #e8ebf0;
+  --fg-2: #b4bcc9;
+  --muted: #8a93a3;
+  --accent: #ff7a1a;
+  --accent-soft: rgba(255, 122, 26, 0.14);
+  --teal: #27d3c3;
+  --teal-soft: rgba(39, 211, 195, 0.13);
+  --bad: #ff6b6b;
+  --bad-soft: rgba(255, 107, 107, 0.13);
+  --font-ui: "Chakra Petch", "Avenir Next Condensed", "Segoe UI", system-ui, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --tabbar-h: 58px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px);
+  min-height: 100%;
+}
+.wrap {
+  max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.k-label { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+
+/* Status bar */
+.top {
+  position: sticky; top: 0; z-index: 5;
+  margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(12, 14, 17, 0.94);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-2);
+  display: grid; gap: 10px;
+}
+.top-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rangebar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); }
+.rangebar button {
+  border: 0; border-right: 1px solid var(--line); background: none; color: var(--muted);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 9px 0; min-height: 38px;
+}
+.rangebar button:last-child { border-right: 0; }
+.rangebar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.jump { display: flex; gap: 6px; flex-wrap: wrap; }
+.jump button {
+  background: none; border: 1px solid var(--line); color: var(--fg-2); padding: 8px 10px; min-height: 36px;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+}
+[id^="sec-"] { scroll-margin-top: calc(var(--hdr-h, 120px) + 12px); }
+.card.coll { padding: 0; }
+.coll-h { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: none; border: 0; color: var(--fg); text-align: left; }
+.coll-t { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.coll-h .sum { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coll-h .sign { font-family: var(--font-num); font-size: 20px; line-height: 1; color: var(--accent); flex: none; width: 20px; text-align: center; }
+.coll-b { padding: 0 16px 12px; border-top: 1px solid var(--line-2); }
+.tiles.glance .tile:nth-child(3n) { border-right: 0; }
+.tiles.glance .tile:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
+.who { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.who h1 { margin: 0; font-weight: 700; font-size: 23px; letter-spacing: 1px; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 40px;
+  background: none; border: 1px solid var(--line); padding: 0 11px;
+  font-family: var(--font-num); font-size: 11px; letter-spacing: 0.5px; color: var(--teal); text-transform: uppercase;
+}
+.sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex: none; }
+.sync.busy { color: var(--accent); }
+.sync.busy i { background: var(--accent); animation: blink 0.9s steps(2) infinite; }
+.sync.stale { color: var(--muted); }
+.sync.stale i { background: var(--muted); }
+@keyframes blink { 50% { opacity: 0.2; } }
+
+/* Banner */
+.banner {
+  margin-top: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 2px solid var(--accent);
+  font-size: 13.5px; color: var(--fg-2); display: flex; gap: 10px; align-items: flex-start;
+}
+.banner b { color: var(--fg); font-weight: 600; }
+.banner .btn { margin-left: auto; flex: none; }
+
+/* Panels */
+main { display: grid; gap: 12px; padding-top: 14px; }
+section[data-tab] { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px; min-width: 0; }
+.card.cut { clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%); }
+.card h2 {
+  margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+.card h2 .sp { flex: 1; }
+.card h2 .aside { letter-spacing: 0; font-family: var(--font-num); font-weight: 500; text-transform: none; }
+.link {
+  background: none; border: 0; padding: 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent);
+}
+.hud-k { display: flex; justify-content: space-between; gap: 10px; }
+.hero-num { font-family: var(--font-num); font-weight: 700; font-size: clamp(40px, 13vw, 54px); line-height: 1; letter-spacing: -1px; margin: 8px 0 8px; color: var(--accent); }
+.hero-num.teal { color: var(--teal); }
+.hud-sub { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-num); font-size: 12px; color: var(--fg-2); text-transform: uppercase; }
+.up-t { color: var(--teal); }
+.down-t { color: var(--bad); }
+.flat-t { color: var(--muted); }
+.sub { color: var(--muted); font-size: 12.5px; }
+.asof { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-2); font-size: 12.5px; color: var(--fg-2); }
+.asof i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex: none; margin-top: 5px; }
+.asof.lag i { background: var(--accent); }
+.asof b { font-family: var(--font-num); font-weight: 500; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--fg); display: block; }
+.asof.lag b { color: var(--accent); }
+.mt { margin-top: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-family: var(--font-num); font-size: 11.5px; font-weight: 500;
+  border: 1px solid var(--line); color: var(--fg-2); white-space: nowrap; text-transform: uppercase;
+}
+.chip.up { color: var(--teal); border-color: rgba(39, 211, 195, 0.4); background: var(--teal-soft); }
+.chip.down { color: var(--bad); border-color: rgba(255, 107, 107, 0.4); background: var(--bad-soft); }
+.chip.hot { color: var(--accent); border-color: rgba(255, 122, 26, 0.45); background: var(--accent-soft); }
+
+/* Stat strip */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); }
+.tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile { padding: 10px 12px; min-width: 0; border-right: 1px solid var(--line); display: grid; gap: 2px; align-content: start; }
+.tile:last-child { border-right: 0; }
+.tile .k { font-size: 10.5px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v { font-family: var(--font-num); font-weight: 700; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v.up { color: var(--teal); }
+.tile .v.down { color: var(--bad); }
+.tile .n { font-family: var(--font-num); font-size: 10.5px; color: var(--fg-2); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Segmented control */
+.seg { display: inline-flex; border: 1px solid var(--line); max-width: 100%; overflow-x: auto; }
+.seg button {
+  border: 0; border-right: 1px solid var(--line); background: none; color: var(--muted);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 8px 11px; white-space: nowrap;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.ctrls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+
+/* Charts */
+.chart { position: relative; min-height: 170px; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--line-2); stroke-width: 1; }
+.chart .ax { fill: var(--muted); font-size: 10.5px; font-family: var(--font-num); }
+.chart .xh { stroke: var(--fg-2); stroke-width: 1; opacity: 0.45; }
+.chart .ring { stroke: var(--surface); stroke-width: 2; }
+.chart-empty { display: grid; place-items: center; min-height: 140px; color: var(--muted); font-size: 13.5px; text-align: center; padding: 0 12px; }
+.tip {
+  position: absolute; top: 0; pointer-events: none; z-index: 2; background: var(--raise); border: 1px solid var(--line);
+  padding: 6px 9px; font-family: var(--font-num); font-size: 11.5px; color: var(--fg-2); white-space: nowrap; transform: translateX(-50%);
+}
+.tip b { color: var(--fg); font-size: 13px; }
+
+/* Lists */
+.list { display: grid; }
+.li { display: flex; align-items: center; gap: 12px; padding: 10px 0; min-width: 0; border-top: 1px solid var(--line-2); }
+.list > .li:first-child, .list > .lib:first-child > .li { border-top: 0; }
+.li .main { flex: 1; min-width: 0; }
+.li .t1 { font-weight: 600; font-size: 15px; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.li .t2 { color: var(--muted); font-size: 12px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.li .end { text-align: right; flex: none; font-family: var(--font-num); }
+.li .end .big { font-weight: 700; font-size: 14.5px; }
+.rank { width: 24px; flex: none; color: var(--muted); font-family: var(--font-num); font-size: 12px; text-align: right; }
+.mono {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center; position: relative;
+  border: 1px solid var(--line); background: var(--raise); font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+}
+.mono.p11 { border-color: rgba(255, 122, 26, 0.6); }
+.pow { position: absolute; right: -6px; bottom: -6px; font-family: var(--font-num); font-size: 9px; font-weight: 700; padding: 0 3px; background: var(--bg); border: 1px solid var(--line); color: var(--fg-2); }
+.mono.p11 .pow { color: var(--accent); border-color: rgba(255, 122, 26, 0.6); }
+.res { width: 46px; flex: none; font-family: var(--font-num); font-weight: 700; font-size: 12.5px; }
+.res.w { color: var(--teal); }
+.res.l { color: var(--bad); }
+.res.d { color: var(--muted); }
+.res.top { color: var(--accent); }
+.you { color: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 1px; margin-left: 6px; }
+.role { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; border: 1px solid var(--line); color: var(--fg-2); }
+.role.president { color: var(--accent); border-color: rgba(255, 122, 26, 0.5); }
+.role.vicePresident { color: var(--teal); border-color: rgba(39, 211, 195, 0.45); }
+.lib > .li { width: 100%; background: none; color: inherit; font: inherit; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; padding-left: 0; padding-right: 0; }
+.detail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 2px 0 12px 50px; }
+.detail div { font-size: 10.5px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.detail b { display: block; color: var(--fg); font-family: var(--font-num); font-size: 14px; letter-spacing: 0; text-transform: none; }
+
+/* Meters */
+.meter { height: 4px; background: var(--line-2); margin-top: 7px; }
+.meter i { display: block; height: 100%; background: var(--fg-2); }
+.meter.hot i { background: var(--accent); }
+.meter.teal i { background: var(--teal); }
+.wl { display: flex; gap: 2px; height: 8px; margin: 12px 0 8px; }
+.wl i { display: block; height: 100%; }
+.wl .w { background: var(--teal); }
+.wl .l { background: var(--bad); }
+.wl .d { background: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--font-num); font-size: 12px; color: var(--fg-2); text-transform: uppercase; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 8px; height: 8px; display: inline-block; }
+.wr { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.wr .pct { font-family: var(--font-num); font-weight: 700; font-size: 44px; line-height: 1; }
+.wr .rec { color: var(--fg-2); font-family: var(--font-num); font-size: 12.5px; text-transform: uppercase; }
+.log { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-2); }
+.log:first-child { border-top: 0; }
+.log .nm { font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log .ds { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log .tc { font-family: var(--font-num); font-weight: 700; font-size: 13.5px; text-align: right; }
+
+/* Forms */
+.field { display: grid; gap: 6px; min-width: 0; }
+.field label { font-size: 10.5px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); background: #0f1216; color: var(--fg); font-size: 15px; border-radius: 0; }
+.input:focus { border-color: var(--accent); outline: none; }
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.form .full { grid-column: 1 / -1; }
+.btn {
+  border: 1px solid var(--accent); padding: 10px 14px; font-weight: 700; font-size: 12.5px; letter-spacing: 1.5px; text-transform: uppercase;
+  background: var(--accent); color: #140a02;
+}
+.btn.ghost { background: none; color: var(--fg); border-color: var(--line); }
+.btn.danger { background: var(--bad-soft); color: var(--bad); border-color: rgba(255, 107, 107, 0.45); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.search { flex: 1; min-width: 150px; }
+.goal { display: grid; gap: 8px; }
+.goal .gt { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
+.goal .gt h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+.goal .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--fg-2); font-family: var(--font-num); font-size: 12.5px; }
+.goal .facts b { color: var(--fg); }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { color: var(--muted); font-size: 12.5px; line-height: 1.5; padding: 0 2px; }
+.skel { color: var(--muted); padding: 32px 4px; text-align: center; font-family: var(--font-num); font-size: 12.5px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* Tab bar */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: rgba(12, 14, 17, 0.96);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line-2);
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sec-label { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); }
+.sec-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.tabbar button {
+  background: none; border: 0; border-top: 2px solid transparent; color: var(--muted);
+  font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 15px 0 14px; min-height: var(--tabbar-h);
+}
+.tabbar button[aria-current="page"] { border-top-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+@media (max-width: 360px) {
+  .tile { padding: 9px 9px; }
+  .tile .v { font-size: 17px; }
+  .detail { padding-left: 0; }
+  .tabbar button { letter-spacing: 0.5px; font-size: 10.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sync.busy i { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="top-row">
+      <div class="who">
+        <span class="k-label" id="hSub">Player // #8YRJ090Q2</span>
+        <h1 id="hName">bboscox</h1>
+      </div>
+      <button class="sync stale" id="refreshBtn" aria-label="Refresh stats now" title="Refresh stats now"><i></i><span id="syncTxt">Loading</span></button>
+    </div>
+    <div class="rangebar" id="rangeBar" role="group" aria-label="Time range for every stat on this tab" hidden></div>
+  </header>
+  <div id="banner"></div>
+  <main id="main">
+    <div class="skel" id="skel">Loading your stats…</div>
+    <section data-tab="me" hidden></section>
+    <section data-tab="club" hidden></section>
+    <section data-tab="brawlers" hidden></section>
+    <section data-tab="goals" hidden></section>
+  </main>
+</div>
+
+<div class="tabbar">
+  <nav aria-label="Sections">
+    <button data-go="me" aria-current="page">Me</button>
+    <button data-go="club">Club</button>
+    <button data-go="brawlers">Brawlers</button>
+    <button data-go="goals">Goals</button>
+  </nav>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const ME = "8YRJ090Q2", CLUB = "2U0RP22G2";
+  // Supabase project: the publishable key only allows reading; all writes go through the server function.
+  const SB_URL = "https://iuukdskmzjglpvtlwldw.supabase.co";
+  const SB_KEY = "sb_publishable_Gxii5jw3MdCFv9CbTsVCKA_g0sIFaWh";
+  const FN_URL = SB_URL + "/functions/v1/brawl";
+  const HOUR = 3600e3, DAY = 864e5;
+  const RANGES = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY, all: Infinity };
+  const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
+
+  const S = {
+    readings: [], battleRows: [], goals: [], loaded: false, ownerCode: null, goalBusy: false,
+    tab: "me", live: { busy: false, err: null, at: 0 },
+    r: { me: "24h", climb: "7d", club: "7d", members: "7d" },
+    bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
+    showAllMaps: false, showAllLog: false, goalKind: "player",
+    chartMode: "time", open: { modes: false, maps: false, log: true }, confirmDel: null, dbWriteBlocked: false,
+  };
+  let D = null;
+
+  // ---------- helpers ----------
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n) => (n == null || isNaN(n) ? "—" : Math.round(n).toLocaleString("en-US"));
+  const sgn = (n, digits = 0) => {
+    if (n == null || isNaN(n)) return "—";
+    const v = digits ? Math.abs(n).toFixed(digits) : Math.round(Math.abs(n)).toLocaleString("en-US");
+    if (Math.abs(n) < (digits ? 0.5 * Math.pow(10, -digits) : 0.5)) return "0";
+    return (n > 0 ? "+" : "−") + v;
+  };
+  // Percent with a tiny nudge so 57.5% rounds to 58, not 57 (0.575 * 100 is 57.4999… in floating point).
+  const pct100 = (r) => Math.round(r * 100 + 1e-9);
+  const cls = (n) => (n == null || isNaN(n) || Math.abs(n) < 0.5 ? "flat" : n > 0 ? "up" : "down");
+  const tcls = (n) => (n == null || isNaN(n) || Math.abs(n) < 0.5 ? "flat-t" : n > 0 ? "up-t" : "down-t");
+  const pad = (n) => String(n).padStart(2, "0");
+  const dayKey = (ts) => { const d = new Date(ts); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const agoShort = (ts) => {
+    const s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 60) return "now";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  };
+  const ago = (ts) => { const a = agoShort(ts); return a === "now" ? "just now" : a + " ago"; };
+  const dShort = (ts) => new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const tShort = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const dtShort = (ts) => dShort(ts) + ", " + tShort(ts);
+  const title = (s) => String(s || "").toLowerCase().replace(/(^|[\s\-.&])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  const modeName = (m) => m ? title(String(m).replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/_/g, " ")) : "Unknown mode";
+  const roleName = { president: "President", vicePresident: "Vice President", senior: "Senior", member: "Member" };
+  const roleShort = { president: "Pres", vicePresident: "VP", senior: "Senior", member: "Member" };
+  const brName = (k) => { const b = D && D.P && D.P.b && D.P.b[k]; return b ? title(b[3]) : title(String(k || "?").replace(/_+/g, " ")); };
+  const initials = (name) => { const w = String(name).replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/); return ((w[0] || "?")[0] + (w[1] ? w[1][0] : (w[0] || "")[1] || "")).toUpperCase(); };
+  const outcome = (b) => {
+    if (/draw/i.test(b.r || "")) return "d";
+    if (b.w === true) return "w";
+    if (b.w === false) return "l";
+    if (/victory|win/i.test(b.r || "")) return "w";
+    if (/defeat|loss/i.test(b.r || "")) return "l";
+    return "d";
+  };
+  const resLabel = (b) => { const m = /rank\s*(\d+)/i.exec(b.r || ""); if (m) return "#" + m[1]; const o = outcome(b); return o === "w" ? "WIN" : o === "l" ? "LOSS" : "DRAW"; };
+  const resCls = (b) => (/rank\s*1$/i.test(b.r || "") ? "top" : outcome(b));
+
+  // ---------- data (Supabase) ----------
+  const cmpSnap = (a, b) => ((a.nb || 0) - (b.nb || 0)) || (a.ts - b.ts);
+  const msOf = (iso) => (iso ? Date.parse(iso) : null);
+  async function rest(path) {
+    const r = await fetch(SB_URL + "/rest/v1/" + path, { headers: { apikey: SB_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("The database answered " + r.status);
+    return r.json();
+  }
+  async function restAll(table, select, filter) {
+    const out = [], page = 1000, order = table === "battles" ? "t" : "ts";
+    for (let off = 0; off < 200000; off += page) {
+      const rows = await rest(table + "?select=" + select + (filter ? "&" + filter : "") + "&order=" + order + ".asc&limit=" + page + "&offset=" + off);
+      out.push(...rows);
+      if (rows.length < page) break;
+    }
+    return out;
+  }
+  async function callFn(body) {
+    const r = await fetch(FN_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify(body) });
+    let j = null;
+    try { j = await r.json(); } catch (e) {}
+    if (!r.ok || !j || j.ok === false && body.action !== "check_code") {
+      const err = new Error((j && j.error) || "The server answered " + r.status);
+      err.code = j && j.error;
+      throw err;
+    }
+    return j;
+  }
+  const mapGoal = (g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created: msOf(g.created_at) });
+  const READ_COLS = "id,ts,nb,src,trophies,club_trophies,player,brawlers,club";
+  async function loadData(full) {
+    if (full || !S.readings.length) {
+      const [rd, bt, gl] = await Promise.all([restAll("readings", READ_COLS), restAll("battles", "*"), rest("goals?select=*&order=created_at.asc")]);
+      S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal);
+      return;
+    }
+    const lastId = Math.max(...S.readings.map((r) => r.id));
+    const lastT = S.battleRows.length ? Math.max(...S.battleRows.map((b) => msOf(b.t))) : 0;
+    // Battles can arrive slightly out of order, so look back a few hours and de-duplicate.
+    const since = new Date(Math.max(0, lastT - 6 * HOUR)).toISOString();
+    const [rd, bt, gl] = await Promise.all([
+      restAll("readings", READ_COLS, "id=gt." + lastId),
+      restAll("battles", "*", "t=gt." + encodeURIComponent(since)),
+      rest("goals?select=*&order=created_at.asc"),
+    ]);
+    S.readings.push(...rd);
+    const bm = new Map(S.battleRows.map((b) => [msOf(b.t), b]));
+    for (const b of bt) bm.set(msOf(b.t), b);
+    S.battleRows = [...bm.values()];
+    S.goals = gl.map(mapGoal);
+  }
+
+  // ---------- derive ----------
+  function derive() {
+    const rs = S.readings.slice().sort((a, b) => msOf(a.ts) - msOf(b.ts) || a.id - b.id);
+    const ticks = [], ps = [], cs = [];
+    let curB = null;
+    for (const r of rs) {
+      const ts = msOf(r.ts), nb = msOf(r.nb);
+      if (r.brawlers) curB = r.brawlers;
+      if (r.trophies != null || r.club_trophies != null) ticks.push([ts, r.trophies, r.club_trophies, nb]);
+      if (r.player) ps.push({ ts, nb, p: r.player, b: curB || {} });
+      if (r.club) cs.push({ ts, c: r.club });
+    }
+    const battles = S.battleRows.map((b) => ({ t: msOf(b.t), m: b.mode, map: b.map, r: b.result, w: b.win, tc: b.tc, br: b.brawler, rk: !!b.ranked }))
+      .filter((b) => !isNaN(b.t)).sort((a, b) => b.t - a.t);
+    const tro = trophySeries(ticks, battles);
+    D = {
+      ticks, ps, cs, battles,
+      pSeries: tro.series, battleTrophies: tro.after,
+      cSeries: ticks.filter((t) => t[2] != null).map((t) => [t[0], t[2]]),
+      eloSeries: ps.filter((s) => s.p.elo != null).map((s) => [s.ts, s.p.elo]),
+      P: ps.reduce((best, s) => (!best || cmpSnap(s, best) > 0 ? s : best), null), C: cs[cs.length - 1] || null,
+    };
+    D.lastTs = rs.length ? msOf(rs[rs.length - 1].ts) : 0;
+    D.firstTs = D.pSeries.length ? D.pSeries[0][0] : ticks.length ? ticks[0][0] : null;
+  }
+  // Trophies after every saved battle, counted back from the reading that contains that battle.
+  // Readings themselves only add points where no battle covers them (quiet stretches, latest value).
+  function trophySeries(ticks, battlesDesc) {
+    const asc = battlesDesc.slice().reverse();
+    const pre = []; let run = 0;
+    for (const b of asc) { run += b.tc || 0; pre.push(run); }
+    const lastAtOrBefore = (t) => { let lo = 0, hi = asc.length - 1, ans = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (asc[m].t <= t) { ans = m; lo = m + 1; } else hi = m - 1; } return ans; };
+    const anchors = ticks.filter((t) => t[1] != null).map((t) => ({ ts: t[0], v: t[1], nb: t[3] != null ? t[3] : null }));
+    const withNb = anchors.filter((a) => a.nb != null).sort((a, b) => a.nb - b.nb || a.ts - b.ts);
+    const after = new Map(), pts = [];
+    let k = 0;
+    for (let i = 0; i < asc.length; i++) {
+      const b = asc[i];
+      while (k < withNb.length && withNb[k].nb < b.t) k++;
+      if (k >= withNb.length) break;
+      const A = withNb[k], j = lastAtOrBefore(A.nb);
+      const v = A.v - ((j >= 0 ? pre[j] : 0) - pre[i]);
+      after.set(b.t, v); pts.push([b.t, v]);
+    }
+    // Where you stood just before the oldest saved battle, so changes include that battle too.
+    if (asc.length && after.has(asc[0].t)) pts.push([asc[0].t - 1000, after.get(asc[0].t) - (asc[0].tc || 0)]);
+    for (const a of anchors) if (a.nb == null) pts.push([a.ts, a.v]);
+    if (withNb.length) {
+      const maxNb = withNb[withNb.length - 1].nb;
+      for (const a of withNb) if (a.nb === maxNb && a.ts > a.nb) pts.push([a.ts, a.v]);
+    }
+    pts.sort((x, y) => x[0] - y[0]);
+    const series = [];
+    for (const p of pts) { if (series.length && series[series.length - 1][0] === p[0]) series[series.length - 1] = p; else series.push(p); }
+    return { series, after };
+  }
+  function valueAt(series, t) { let v = null; for (const p of series) { if (p[0] <= t) v = p; else break; } return v; }
+  function change(series, ms) {
+    if (!series.length) return null;
+    const last = series[series.length - 1];
+    let base = ms === Infinity ? series[0] : valueAt(series, Date.now() - ms), partial = false;
+    if (!base) { base = series[0]; partial = true; }
+    return { delta: last[1] - base[1], from: base[0], partial, span: (last[0] - base[0]) / DAY };
+  }
+  function perDay(series, ms) {
+    const c = change(series, ms);
+    if (!c || c.span < 0.5) return null;
+    return { rate: c.delta / c.span, partial: c.partial, span: c.span };
+  }
+  function snapAt(snaps, t) { let s = null; for (const x of snaps) { if (x.ts <= t) s = x; else break; } return s || snaps[0] || null; }
+  function inRange(ts, key) { return RANGES[key] === Infinity || ts >= Date.now() - RANGES[key]; }
+  // When did the club feed last change? The first reading that shows the current total marks it.
+  function clubFreshness() {
+    const s = D.cSeries;
+    if (!s.length || !D.C) return null;
+    const cur = s[s.length - 1][1];
+    let since = s[0][0], changed = false;
+    for (let i = s.length - 1; i > 0; i--) { if (s[i - 1][1] !== cur) { since = s[i][0]; changed = true; break; } }
+    const meRow = (D.C.c.members || []).find((m) => m[0] === ME);
+    const clubSays = meRow ? meRow[3] : null, profileSays = D.P ? D.P.p.trophies : null;
+    const stale = Date.now() - since > 2 * HOUR;
+    const behind = stale && clubSays != null && profileSays != null && clubSays !== profileSays && D.P.ts >= D.C.ts - 5 * 60e3;
+    return { since, changed, checked: s[s.length - 1][0], clubSays, profileSays, behind, lag: behind || stale, source: "BrawlTime" };
+  }
+  function clubRows() {
+    if (!D.C) return [];
+    return (D.C.c.members || []).map((m) => ({ tag: m[0], name: m[1], role: m[2], tr: m[3] })).sort((a, b) => b.tr - a.tr);
+  }
+
+  // ---------- chart ----------
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+  function niceScale(min, max, n) {
+    if (max - min < 1e-9) { const padv = Math.max(2, Math.abs(max) * 0.0004); min -= padv; max += padv; }
+    const step = Math.max(1, niceStep((max - min) / n));
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const ticks = []; for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+    return { min: lo, max: hi, ticks };
+  }
+  function drawChart(host, pts, o) {
+    host.innerHTML = "";
+    if (!pts.length) { host.innerHTML = '<div class="chart-empty">' + esc(o.empty || "No readings yet.") + "</div>"; return; }
+    const W = Math.max(260, host.clientWidth || 320), H = o.h || 170, L = 2, R = 60, T = 12, B = 24;
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    let x0 = Math.min(...xs), x1 = Math.max(...xs);
+    if (x0 === x1) { const pd = o.index ? 1 : HOUR; x0 -= pd; x1 += pd; }
+    const sc = niceScale(Math.min(...ys, ...(o.zero ? [0] : [])), Math.max(...ys, ...(o.zero ? [0] : [])), 3);
+    const sx = (x) => L + ((x - x0) / (x1 - x0)) * (W - L - R);
+    const sy = (y) => T + (1 - (y - sc.min) / (sc.max - sc.min)) * (H - T - B);
+    let g = "";
+    for (const v of sc.ticks) {
+      const y = sy(v).toFixed(1);
+      g += '<line class="grid" x1="' + L + '" x2="' + (W - R + 4) + '" y1="' + y + '" y2="' + y + '"/>';
+      g += '<text class="ax" x="' + (W - R + 10) + '" y="' + y + '" dy="4">' + esc(o.fmtY ? o.fmtY(v) : fmt(v)) + "</text>";
+    }
+    if (o.zero && sc.min < 0 && sc.max > 0) {
+      const y = sy(0).toFixed(1);
+      g += '<line x1="' + L + '" x2="' + (W - R + 4) + '" y1="' + y + '" y2="' + y + '" style="stroke:var(--muted);stroke-width:1;opacity:.7"/>';
+    }
+    const xl = o.xLabels || [o.index ? "OLDER" : (x1 - x0 < 2 * DAY ? tShort(x0) : dShort(x0)), o.index ? "LATEST" : (x1 - x0 < 2 * DAY ? tShort(x1) : dShort(x1))];
+    g += '<text class="ax" x="' + L + '" y="' + (H - 5) + '">' + esc(xl[0]) + "</text>";
+    g += '<text class="ax" x="' + (W - R) + '" y="' + (H - 5) + '" text-anchor="end">' + esc(xl[1]) + "</text>";
+    const color = o.color || "var(--accent)";
+    if (pts.length > 1) {
+      const line = pts.map((p, i) => (i ? "L" : "M") + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join(" ");
+      const base = sy(o.zero ? Math.max(sc.min, Math.min(0, sc.max)) : sc.min).toFixed(1);
+      const area = line + " L" + sx(pts[pts.length - 1][0]).toFixed(1) + " " + base + " L" + sx(pts[0][0]).toFixed(1) + " " + base + " Z";
+      g += '<path d="' + area + '" style="fill:' + color + ';opacity:.08;stroke:none"/>';
+      g += '<path d="' + line + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:miter"/>';
+    }
+    const lp = pts[pts.length - 1];
+    g += '<rect class="ring" x="' + (sx(lp[0]) - 4).toFixed(1) + '" y="' + (sy(lp[1]) - 4).toFixed(1) + '" width="8" height="8" style="fill:' + color + '"/>';
+    g += '<line class="xh" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" visibility="hidden"/>';
+    g += '<rect class="ring hd" width="8" height="8" style="fill:' + color + '" visibility="hidden"/>';
+    g += '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:transparent"/>';
+    host.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(o.label || "Chart") + '">' + g + '</svg><div class="tip" hidden></div>';
+    const svg = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = svg.querySelector(".xh"), hd = svg.querySelector(".hd");
+    const show = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = ((ev.clientX - r.left) / r.width) * W;
+      let best = 0, bd = Infinity;
+      pts.forEach((p, i) => { const d = Math.abs(sx(p[0]) - px); if (d < bd) { bd = d; best = i; } });
+      const p = pts[best], cx = sx(p[0]), cy = sy(p[1]);
+      xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
+      hd.setAttribute("x", cx - 4); hd.setAttribute("y", cy - 4); hd.setAttribute("visibility", "visible");
+      tip.innerHTML = o.tip ? o.tip(p, best) : "<b>" + fmt(p[1]) + "</b><br>" + esc(dtShort(p[0]));
+      tip.hidden = false;
+      const left = (cx / W) * r.width, tw = tip.offsetWidth || 120;
+      tip.style.left = Math.min(Math.max(left, tw / 2), r.width - tw / 2) + "px";
+      tip.style.top = Math.max(0, (cy / H) * r.height - 52) + "px";
+    };
+    const hide = () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); hd.setAttribute("visibility", "hidden"); };
+    svg.addEventListener("pointermove", show);
+    svg.addEventListener("pointerdown", show);
+    svg.addEventListener("pointerleave", hide);
+    svg.addEventListener("pointercancel", hide);
+  }
+  const charts = [];
+  function chartSlot(id, fn) { charts.push({ id, fn }); return '<div class="chart" id="' + id + '"></div>'; }
+  function flushCharts() { const list = charts.splice(0); for (const c of list) { const el = document.getElementById(c.id); if (el) c.fn(el); } }
+
+  // ---------- UI pieces ----------
+  const seg = (group, key, opts) => '<div class="seg" role="group">' + opts.map(([v, l]) => '<button data-seg="' + group + '" data-v="' + v + '" aria-pressed="' + (key === v) + '">' + l + "</button>").join("") + "</div>";
+  const rangeSeg = (group, keys = ["24h", "7d", "30d", "all"]) => seg(group, S.r[group], keys.map((k) => [k, RANGE_LABEL[k]]));
+  const chip = (n, suffix = "", kind) => '<span class="chip ' + (kind || cls(n)) + '">' + sgn(n) + suffix + "</span>";
+  function sinceNote(c) { return c && c.partial ? '<div class="sub mt">Tracking started ' + esc(dtShort(D.firstTs)) + ". Longer ranges fill in over time.</div>" : ""; }
+  const rateTile = (label, series, key) => {
+    const r = perDay(series, RANGES[key]);
+    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (r ? cls(r.rate) : "") + '">' + (r ? sgn(r.rate) : "—") + '</div><div class="n">' + (r ? (r.partial ? "/day so far" : "per day") : "needs data") + "</div></div>";
+  };
+  const changeTile = (label, series, key) => {
+    const c = change(series, RANGES[key]);
+    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (c ? cls(c.delta) : "") + '">' + (c ? sgn(c.delta) : "—") + '</div><div class="n">' + (c && c.partial ? "since start" : "trophies") + "</div></div>";
+  };
+  const logRow = (b) => {
+    const nm = b.br ? brName(b.br) : modeName(b.m);
+    return '<div class="log"><span class="res ' + resCls(b) + '">' + esc(resLabel(b)) + '</span><div style="min-width:0"><div class="nm">' + esc(nm) + '</div><div class="ds">' + esc(modeName(b.m) + " · " + (b.map || "") + " · " + ago(b.t)) + (b.rk ? " · Ranked" : "") + '</div></div><span class="tc ' + tcls(b.tc) + '">' + (b.tc == null ? "—" : sgn(b.tc)) + "</span></div>";
+  };
+
+  // ---------- tabs ----------
+  function streakInfo(list) {
+    let k = null, n = 0;
+    for (const b of list) { const o = outcome(b); if (o === "d") break; if (k == null) k = o; if (o !== k) break; n++; }
+    if (!n) return { v: "—", n: "no streak", c: "" };
+    return { v: n + (k === "w" ? "W" : "L"), n: "in a row", c: k === "w" ? "up" : "down" };
+  }
+  function drawTrophyChart(el) {
+    const rk = S.r.me, ms = RANGES[rk];
+    if (S.chartMode === "battle") {
+      const list = D.battles.filter((b) => inRange(b.t, rk) && D.battleTrophies.has(b.t)).slice().reverse();
+      const pts = list.map((b, i) => [i, D.battleTrophies.get(b.t)]);
+      const start = list.length ? pts[0][1] - (list[0].tc || 0) : 0;
+      drawChart(el, pts, {
+        index: true, color: "var(--teal)", label: "Trophies after each battle", empty: "No battles in this range yet.",
+        xLabels: [list.length + (list.length === 1 ? " BATTLE" : " BATTLES") + " AGO", "LATEST"],
+        tip: (pt, i) => { const b = list[i]; return "<b>" + fmt(pt[1]) + "</b> · " + esc(sgn(pt[1] - start)) + " in range<br>" + esc(resLabel(b) + " · " + (b.br ? brName(b.br) : modeName(b.m)) + " · " + (b.tc == null ? "—" : sgn(b.tc))) + "<br>" + esc(dtShort(b.t)); },
+      });
+      return;
+    }
+    let pts = D.pSeries.filter((pt) => inRange(pt[0], rk));
+    if (rk !== "all") {
+      const b0 = valueAt(D.pSeries, Date.now() - ms);
+      if (b0) pts = [[Date.now() - ms, b0[1]]].concat(pts);
+    }
+    const first = pts.length ? pts[0][1] : 0;
+    drawChart(el, pts, {
+      color: "var(--accent)", label: "Trophies over time", empty: "Readings appear here as updates come in.",
+      tip: (pt) => "<b>" + fmt(pt[1]) + "</b> · " + esc(sgn(pt[1] - first)) + " in range<br>" + esc(dtShort(pt[0])),
+    });
+  }
+  function renderMe() {
+    const P = D.P;
+    if (!P) return emptyState("Your trophies will appear after the first update.");
+    const p = P.p, rk = S.r.me, ms = RANGES[rk];
+    const c24 = change(D.pSeries, DAY);
+    const cr = change(D.pSeries, ms);
+    const rr = rk === "24h" ? null : perDay(D.pSeries, ms);
+    const st = wlStats(D.battles.filter((b) => inRange(b.t, rk)));
+    const sk = streakInfo(D.battles);
+    const eloC = change(D.eloSeries, ms);
+    const base = snapAt(D.ps, Date.now() - ms);
+    const vg = (k) => (base && p[k] != null && base.p[k] != null ? p[k] - base.p[k] : null);
+    const rows = clubRows(), mine = rows.findIndex((r) => r.tag === ME), myRole = mine >= 0 ? rows[mine].role : null;
+    const tile = (k, v, n, c) => '<div class="tile"><div class="k">' + k + '</div><div class="v ' + (c || "") + '">' + v + '</div><div class="n">' + n + "</div></div>";
+    const since = (t) => (Date.now() - t < DAY ? tShort(t) : dShort(t));
+    const trophNote = !cr ? "no data" : cr.partial ? "since " + since(cr.from) : rr ? sgn(rr.rate, Math.abs(rr.rate) < 10 ? 1 : 0) + "/day" : "in " + RANGE_LABEL[rk];
+    const inPts = D.pSeries.filter((pt) => inRange(pt[0], rk));
+    const startV = rk === "all" ? (inPts[0] || [0, null])[1] : (valueAt(D.pSeries, Date.now() - ms) || inPts[0] || [0, null])[1];
+    const endV = D.pSeries.length ? D.pSeries[D.pSeries.length - 1][1] : null;
+    const jumps = [["sec-overview", "Overview"], ["sec-battles", "Battles"], ["sec-modes", "Modes"], ["sec-log", "Log"], ["sec-career", "Career"]];
+    return (
+      '<div class="card cut" id="sec-overview">' +
+        '<div class="hud-k k-label"><span>Trophies</span><span>' + esc(((D.C && D.C.c.name) || p.club || "") + (myRole ? " · " + (roleShort[myRole] || myRole) : "")) + "</span></div>" +
+        '<div class="hero-num">' + fmt(p.trophies) + "</div>" +
+        '<div class="hud-sub"><span>Peak ' + fmt(p.highest) + "</span>" +
+          (p.trophies >= p.highest ? '<span class="up-t">At peak</span>' : "<span>" + fmt(p.highest - p.trophies) + " off peak</span>") +
+          (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
+        "</div>" +
+      "</div>" +
+      '<div class="jump" role="navigation" aria-label="Jump to section">' + jumps.map(([id, l]) => '<button data-jump="' + id + '">' + l + "</button>").join("") + "</div>" +
+      '<div class="tiles glance">' +
+        tile("Trophies", cr ? sgn(cr.delta) : "—", esc(trophNote), cr ? cls(cr.delta) : "") +
+        tile("Win rate", st.rate == null ? "—" : pct100(st.rate) + "%", st.w + "W " + st.l + "L" + (st.d ? " " + st.d + "D" : "")) +
+        tile("Per battle", st.perBattle == null ? "—" : sgn(st.perBattle, 1), st.n + (st.n === 1 ? " battle" : " battles"), cls(st.perBattle)) +
+        tile("Streak", sk.v, sk.n, sk.c) +
+        tile("Elo", fmt(p.elo), esc(p.rankName || "Unranked")) +
+        tile("Club", mine >= 0 ? "#" + (mine + 1) : "—", "of " + (rows.length || "—")) +
+      "</div>" +
+      '<div class="card" id="sec-trend"><h2>Trophy trace</h2>' +
+        '<div class="ctrls">' + seg("chart", S.chartMode, [["time", "By time"], ["battle", "By battle"]]) +
+          (startV != null && endV != null ? '<span class="hud-sub"><span>' + fmt(startV) + " → " + fmt(endV) + '</span><span class="' + tcls(endV - startV) + '">' + sgn(endV - startV) + "</span></span>" : "") +
+        "</div>" +
+        chartSlot("chMe", drawTrophyChart) +
+        sinceNote(cr) +
+      "</div>" +
+      battlesSection() +
+      '<div class="sec-label" id="sec-career">Career</div>' +
+      '<div class="card"><h2>Ranked<span class="sp"></span>' + (eloC ? '<span class="aside ' + tcls(eloC.delta) + '">' + sgn(eloC.delta) + " Elo · " + RANGE_LABEL[rk] + "</span>" : "") + "</h2>" +
+        '<div style="font-weight:700;font-size:22px;letter-spacing:1px;text-transform:uppercase">' + esc(p.rankName || "Unranked") + '</div><div class="sub num">' + fmt(p.elo) + " Elo</div>" +
+        '<div class="tiles two mt"><div class="tile"><div class="k">Season best</div><div class="v">' + fmt(p.seasonBestElo) + '</div></div><div class="tile"><div class="k">All-time best</div><div class="v">' + fmt(p.bestElo) + '</div><div class="n">' + esc(p.bestRankName || "") + "</div></div></div>" +
+      "</div>" +
+      '<div class="card"><h2>Victories<span class="sp"></span><span class="aside">gained · ' + RANGE_LABEL[rk] + "</span></h2>" +
+        '<div class="tiles">' +
+          ["v3", "solo", "duo"].map((k, i) => '<div class="tile"><div class="k">' + ["3v3", "Solo", "Duo"][i] + '</div><div class="v">' + fmt(p[k]) + '</div><div class="n ' + (vg(k) > 0 ? "up-t" : "") + '">' + (vg(k) == null ? "—" : sgn(vg(k))) + "</div></div>").join("") +
+        "</div>" +
+        '<div class="hud-sub mt"><span>Level ' + fmt(p.exp) + "</span><span>Prestige " + fmt(p.prestige) + "</span><span>" + Object.keys(P.b || {}).length + " brawlers</span></div>" +
+      "</div>" +
+      '<p class="note">Stats come from BrawlTime Ninja\'s public feed. Your server saves a reading every 30 minutes, and the app pulls a fresh one when you open it or tap the sync pill.</p>'
+    );
+  }
+
+  function wlStats(list) {
+    let w = 0, l = 0, d = 0, net = 0, tcn = 0;
+    for (const b of list) { const o = outcome(b); if (o === "w") w++; else if (o === "l") l++; else d++; if (b.tc != null) { net += b.tc; tcn++; } }
+    return { w, l, d, n: list.length, rate: w + l ? w / (w + l) : null, net, perBattle: tcn ? net / tcn : null };
+  }
+  function wlBar(st) {
+    if (!st.n) return "";
+    const seg2 = (k, v) => (v ? '<i class="' + k + '" style="flex:' + v + '"></i>' : "");
+    return '<div class="wl" role="img" aria-label="' + st.w + " wins, " + st.l + " losses, " + st.d + ' draws">' + seg2("w", st.w) + seg2("l", st.l) + seg2("d", st.d) + "</div>";
+  }
+  function streakText(list) {
+    let k = null, n = 0;
+    for (const b of list) { const o = outcome(b); if (o === "d") break; if (k == null) k = o; if (o !== k) break; n++; }
+    if (!n) return "No streak";
+    return n + (k === "w" ? " win" : " loss") + (n === 1 ? "" : k === "w" ? "s" : "es") + " in a row";
+  }
+
+  function battlesSection() {
+    const rk = S.r.me;
+    const all = D.battles.filter((b) => S.bType === "all" || (S.bType === "ranked" ? b.rk : !b.rk));
+    const list = all.filter((b) => inRange(b.t, rk));
+    const st = wlStats(list);
+    const head = '<div class="sec-label" id="sec-battles">Battles</div>';
+    const ctrl = '<div class="ctrls"><span class="k-label">Win rate · ' + RANGE_LABEL[rk] + "</span>" + seg("bType", S.bType, [["all", "All"], ["trophy", "Trophy"], ["ranked", "Ranked"]]) + "</div>";
+    if (!list.length)
+      return head + '<div class="card cut">' + ctrl + '<div class="chart-empty" style="min-height:90px">No ' + (S.bType === "all" ? "" : S.bType + " ") + "battles saved in this range yet.</div></div>";
+    const group = (keyFn) => {
+      const m = new Map();
+      for (const b of list) { const k = keyFn(b); if (!m.has(k)) m.set(k, []); m.get(k).push(b); }
+      return [...m.entries()].map(([k, v]) => ({ k, s: wlStats(v), mode: v[0].m })).sort((a, b) => b.s.n - a.s.n);
+    };
+    const statRow = (name, sub, s) =>
+      '<div class="li"><div class="main"><div class="t1">' + esc(name) + '</div><div class="t2">' + esc(sub) + '</div><div class="meter hot"><i style="width:' + (s.rate == null ? 0 : pct100(s.rate)) + '%"></i></div></div>' +
+      '<div class="end"><div class="big">' + (s.rate == null ? "—" : pct100(s.rate) + "%") + '</div><div class="t2 ' + tcls(s.net) + '">' + sgn(s.net) + "</div></div></div>";
+    const modes = group((b) => b.m || "unknown");
+    const maps = group((b) => (b.map || "Unknown map") + "|" + (b.m || ""));
+    const mapsShown = S.showAllMaps ? maps : maps.slice(0, 6);
+    const pct = (s) => (s.rate == null ? "—" : pct100(s.rate) + "%");
+    const more = (n) => (n > 0 ? " · +" + n + " more" : "");
+    const coll = (key, id, label, summary, body) => {
+      const open = !!S.open[key];
+      return '<div class="card coll"' + (id ? ' id="' + id + '"' : "") + '><button class="coll-h" data-toggle="' + key + '" aria-expanded="' + open + '">' +
+        '<span class="coll-t"><span class="k-label">' + label + '</span><span class="sum">' + esc(summary) + "</span></span>" +
+        '<span class="sign" aria-hidden="true">' + (open ? "−" : "+") + "</span></button>" +
+        (open ? '<div class="coll-b">' + body + "</div>" : "") + "</div>";
+    };
+    const top = modes[0], topMap = maps[0], last = list[0];
+    const when = (t) => (Date.now() - t < DAY ? tShort(t) : dtShort(t));
+    return (
+      head +
+      '<div class="card cut">' + ctrl +
+        '<div class="wr"><span class="pct">' + pct(st) + '</span><span class="rec">' + st.n + (st.n === 1 ? " battle" : " battles") + ' · net <span class="' + tcls(st.net) + '">' + sgn(st.net) + "</span> · " + (st.perBattle == null ? "—" : sgn(st.perBattle, 1)) + "/battle</span></div>" +
+        wlBar(st) +
+        '<div class="legend"><span><i style="background:var(--teal)"></i>' + st.w + " wins</span><span><i style=\"background:var(--bad)\"></i>" + st.l + " losses</span>" + (st.d ? '<span><i style="background:var(--muted)"></i>' + st.d + " draws</span>" : "") + "</div>" +
+        '<div class="sub mt">' + esc(streakText(all)) + ". Solo Showdown counts a top-5 finish as a win, as BrawlTime does.</div>" +
+      "</div>" +
+      coll("modes", "sec-modes", "By mode", modeName(top.k) + " · " + pct(top.s) + " · " + top.s.n + " battles" + more(modes.length - 1),
+        '<div class="list">' + modes.map((g) => statRow(modeName(g.k), g.s.w + "W · " + g.s.l + "L" + (g.s.d ? " · " + g.s.d + "D" : "") + " · " + g.s.n + " battles", g.s)).join("") + "</div>") +
+      coll("maps", "", "By map", topMap.k.split("|")[0] + " · " + pct(topMap.s) + " · " + topMap.s.n + " battles" + more(maps.length - 1),
+        '<div class="list">' + mapsShown.map((g) => statRow(g.k.split("|")[0], modeName(g.mode) + " · " + g.s.w + "W · " + g.s.l + "L · " + g.s.n + " battles", g.s)).join("") + "</div>" +
+        (maps.length > 6 ? '<button class="link mt" data-act="maps">' + (S.showAllMaps ? "Show fewer" : "Show all " + maps.length) + "</button>" : "")) +
+      coll("log", "sec-log", "Match log · " + list.length + " saved", "Latest: " + resLabel(last) + " with " + (last.br ? brName(last.br) : modeName(last.m)) + " · " + (last.tc == null ? "—" : sgn(last.tc)) + " · " + when(last.t),
+        '<div class="list">' + list.slice(0, S.showAllLog ? 200 : 10).map(logRow).join("") + "</div>" +
+        (list.length > 10 ? '<button class="link mt" data-act="log">' + (S.showAllLog ? "Show fewer" : "Show " + (Math.min(list.length, 200) - 10) + " more") + "</button>" : ""))
+    );
+  }
+
+  function renderBrawlers() {
+    const P = D.P;
+    if (!P || !P.b) return emptyState("Your brawlers will appear after the first update.");
+    const keys = Object.keys(P.b);
+    const base = snapAt(D.ps, Date.now() - RANGES[S.r.climb]);
+    const partial = base && D.ps.length && base.ts > Date.now() - RANGES[S.r.climb] + HOUR;
+    const gain = (k) => (base && base.b && base.b[k] ? P.b[k][0] - base.b[k][0] : null);
+    const played = new Map();
+    for (const b of D.battles) if (b.br && inRange(b.t, S.r.climb)) { if (!played.has(b.br)) played.set(b.br, []); played.get(b.br).push(b); }
+    let rows = keys.map((k) => ({ k, name: title(P.b[k][3]), tr: P.b[k][0], hi: P.b[k][1], pow: P.b[k][2], g: gain(k), pl: played.get(k) || [] }));
+    const q = S.brQuery.trim().toLowerCase();
+    if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+    if (S.brSort === "trophies") rows.sort((a, b) => b.tr - a.tr);
+    else if (S.brSort === "climb") rows.sort((a, b) => (b.g ?? -1e9) - (a.g ?? -1e9) || b.tr - a.tr);
+    else rows.sort((a, b) => b.pl.length - a.pl.length || b.tr - a.tr);
+    const all = keys.map((k) => P.b[k]);
+    const climbers = keys.map((k) => ({ k, g: gain(k) })).filter((x) => x.g > 0).sort((a, b) => b.g - a.g).slice(0, 3);
+    return (
+      '<div class="tiles">' +
+        '<div class="tile"><div class="k">Unlocked</div><div class="v">' + keys.length + "</div></div>" +
+        '<div class="tile"><div class="k">Power 11</div><div class="v">' + all.filter((b) => b[2] >= 11).length + "</div></div>" +
+        '<div class="tile"><div class="k">1,000+</div><div class="v">' + all.filter((b) => b[0] >= 1000).length + "</div></div>" +
+      "</div>" +
+      '<div class="card"><h2>Biggest climbers · ' + RANGE_LABEL[S.r.climb] + "</h2>" +
+        (climbers.length
+          ? '<div class="list">' + climbers.map((c) => '<div class="li"><div class="mono">' + esc(initials(brName(c.k))) + '</div><div class="main"><div class="t1">' + esc(brName(c.k)) + '</div><div class="t2 num">' + fmt(P.b[c.k][0]) + ' trophies</div></div><div class="end"><span class="chip up">' + sgn(c.g) + "</span></div></div>").join("") + "</div>"
+          : '<div class="sub">No brawler has gained trophies in this range yet' + (partial ? " (tracking started " + esc(dtShort(D.firstTs)) + ")" : "") + ".</div>") +
+      "</div>" +
+      '<div class="card">' +
+        '<div class="ctrls"><div class="search"><input class="input" id="brSearch" type="search" placeholder="Search brawlers" aria-label="Search brawlers" value="' + esc(S.brQuery) + '"></div></div>' +
+        '<div class="ctrls">' + seg("brSort", S.brSort, [["trophies", "Trophies"], ["climb", "Climbers"], ["played", "Played"]]) + rangeSeg("climb", ["24h", "7d", "30d"]) + "</div>" +
+        '<div class="list" id="brList">' +
+          rows.map((r, i) => {
+            const open = S.openBrawler === r.k, st = wlStats(r.pl), b = P.b[r.k];
+            return '<div class="lib"><button class="li" data-br="' + esc(r.k) + '" aria-expanded="' + open + '">' +
+              '<span class="rank">' + (i + 1) + "</span>" +
+              '<span class="mono' + (r.pow >= 11 ? " p11" : "") + '">' + esc(initials(r.name)) + '<span class="pow">P' + r.pow + "</span></span>" +
+              '<span class="main"><span class="t1" style="display:block">' + esc(r.name) + '</span><span class="t2" style="display:block">Best ' + fmt(r.hi) + (r.pl.length ? " · " + r.pl.length + " played" : "") + "</span></span>" +
+              '<span class="end"><span class="big" style="display:block">' + fmt(r.tr) + '</span><span class="t2 ' + (r.g == null ? "flat-t" : tcls(r.g)) + '" style="display:block">' + (r.g == null ? "new" : sgn(r.g)) + "</span></span>" +
+            "</button>" +
+            (open
+              ? '<div class="detail"><div>Battles<b>' + st.n + "</b></div><div>Win rate<b>" + (st.rate == null ? "—" : pct100(st.rate) + "%") + "</b></div><div>Net<b>" + sgn(st.net) + "</b></div>" +
+                "<div>Best<b>" + fmt(b[1]) + "</b></div><div>Max streak<b>" + fmt(b[5]) + "</b></div><div>Prestige<b>" + fmt(b[4]) + "</b></div></div>"
+              : "") +
+            "</div>";
+          }).join("") +
+          (rows.length ? "" : '<div class="sub" style="padding:12px 0">No brawler matches “' + esc(S.brQuery) + "”.</div>") +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderClub() {
+    const C = D.C;
+    if (!C) return emptyState("Club stats will appear after the first update.");
+    const c = Object.assign({ members: [] }, C.c);
+    const c24 = change(D.cSeries, DAY), cr = change(D.cSeries, RANGES[S.r.club]);
+    const base = snapAt(D.cs, Date.now() - RANGES[S.r.members]);
+    const baseMap = new Map(((base && base.c.members) || []).map((m) => [m[0], m[3]]));
+    const covered = base ? (Date.now() - base.ts) / DAY : 0;
+    const rows = c.members.map((m) => ({ tag: m[0], name: m[1], role: m[2], tr: m[3], g: baseMap.has(m[0]) ? m[3] - baseMap.get(m[0]) : null }));
+    const byTrophies = rows.slice().sort((a, b) => b.tr - a.tr);
+    const sorted = S.memSort === "gain" ? rows.slice().sort((a, b) => (b.g ?? -1e9) - (a.g ?? -1e9) || b.tr - a.tr) : byTrophies;
+    const nowTags = new Set(rows.map((r) => r.tag));
+    const joined = base ? rows.filter((r) => !baseMap.has(r.tag)) : [];
+    const left = base ? (base.c.members || []).filter((m) => !nowTags.has(m[0])) : [];
+    const canInactive = covered >= 6.5 && S.r.members !== "24h";
+    const top = rows.filter((r) => r.g > 0).sort((a, b) => b.g - a.g)[0];
+    const mine = byTrophies.findIndex((r) => r.tag === ME);
+    const fr = clubFreshness();
+    return (
+      '<div class="card cut">' +
+        '<div class="hud-k k-label"><span>' + esc(c.name) + " // #" + esc(c.tag) + "</span><span>" + c.members.length + "/30</span></div>" +
+        '<div class="hero-num teal">' + fmt(c.trophies) + "</div>" +
+        '<div class="hud-sub">' + (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
+          "<span>" + esc(c.type || "") + "</span><span>" + fmt(c.req) + "+ to join</span></div>" +
+        (c.desc ? '<div class="sub mt">' + esc(c.desc) + "</div>" : "") +
+        (fr
+          ? '<div class="asof' + (fr.lag ? " lag" : "") + '"><i></i><div><b>Club data as of ' + esc(fr.changed ? ago(fr.since) : dtShort(fr.since)) + "</b>" +
+              (fr.changed ? "Last changed " + esc(dtShort(fr.since)) + ". " : "Unchanged since tracking began. ") + "Checked " + esc(ago(fr.checked)) + " from " + fr.source + "." +
+              (fr.behind ? " The club list shows you at " + fmt(fr.clubSays) + " while your profile says " + fmt(fr.profileSays) + ", so the club feed is running behind. Member trophies here may be out of date." : "") +
+            "</div></div>"
+          : "") +
+      "</div>" +
+      '<div class="tiles">' + changeTile("Last 24h", D.cSeries, "24h") + rateTile("7-day rate", D.cSeries, "7d") + rateTile("30-day rate", D.cSeries, "30d") + "</div>" +
+      '<div class="card"><h2>Club trophy trace<span class="sp"></span><span class="aside ' + (cr ? tcls(cr.delta) : "") + '">' + (cr ? sgn(cr.delta) + " in range" : "") + "</span></h2>" +
+        '<div class="ctrls">' + rangeSeg("club") + "</div>" +
+        chartSlot("chClub", (el) => drawChart(el, D.cSeries.filter((pt) => inRange(pt[0], S.r.club)), { color: "var(--teal)", label: "Club trophies over time", empty: "Readings appear here as updates come in." })) +
+        sinceNote(cr) +
+      "</div>" +
+      '<div class="tiles two">' +
+        '<div class="tile"><div class="k">Your club rank</div><div class="v">' + (mine >= 0 ? "#" + (mine + 1) : "—") + '</div><div class="n">of ' + rows.length + "</div></div>" +
+        '<div class="tile"><div class="k">Top gainer · ' + RANGE_LABEL[S.r.members] + '</div><div class="v ' + (top ? "up" : "") + '">' + (top ? sgn(top.g) : "—") + '</div><div class="n" style="text-transform:none">' + (top ? esc(top.name) : "no gains yet") + "</div></div>" +
+      "</div>" +
+      '<div class="card"><h2>Member board<span class="sp"></span>' + (fr ? '<span class="aside' + (fr.lag ? '" style="color:var(--accent)' : "") + '">as of ' + esc(fr.changed ? ago(fr.since) : dtShort(fr.since)) + "</span>" : "") + "</h2>" +
+        '<div class="ctrls">' + seg("memSort", S.memSort, [["trophies", "Trophies"], ["gain", "Gains"]]) + rangeSeg("members", ["24h", "7d", "30d"]) + "</div>" +
+        '<div class="list">' +
+          sorted.map((r, i) => {
+            const inactive = canInactive && r.g === 0;
+            return '<div class="li"><span class="rank">' + (i + 1) + '</span><div class="main"><div class="t1">' + esc(r.name) + (r.tag === ME ? '<span class="you">YOU</span>' : "") +
+              (r.role && r.role !== "member" ? '<span class="role ' + esc(r.role) + '">' + esc(roleName[r.role] || r.role) + "</span>" : "") + "</div>" +
+              '<div class="t2 num">' + (String(r.tag).startsWith("~") ? "Tag pending" : "#" + esc(r.tag)) + (inactive ? " · no change " + RANGE_LABEL[S.r.members] : "") + "</div></div>" +
+              '<div class="end"><div class="big">' + fmt(r.tr) + "</div>" +
+              (r.g == null ? '<div class="t2 up-t">joined</div>' : inactive ? '<div class="t2 down-t">inactive</div>' : '<div class="t2 ' + tcls(r.g) + '">' + sgn(r.g) + "</div>") +
+              "</div></div>";
+          }).join("") +
+        "</div>" +
+        (!canInactive ? '<div class="sub mt">Inactive members are flagged once a full week of readings is saved' + (D.firstTs ? " (tracking started " + esc(dShort(D.firstTs)) + ")" : "") + ".</div>" : "") +
+      "</div>" +
+      (joined.length || left.length
+        ? '<div class="card"><h2>Roster changes · ' + RANGE_LABEL[S.r.members] + '</h2><div class="list">' +
+            joined.map((r) => '<div class="li"><div class="main"><div class="t1">' + esc(r.name) + '</div><div class="t2 num">#' + esc(r.tag) + '</div></div><span class="chip up">Joined</span></div>').join("") +
+            left.map((m) => '<div class="li"><div class="main"><div class="t1">' + esc(m[1]) + '</div><div class="t2 num">#' + esc(m[0]) + " · " + fmt(m[3]) + '</div></div><span class="chip down">Left</span></div>').join("") +
+          "</div></div>"
+        : "")
+    );
+  }
+
+  // ---------- goals ----------
+  function goalSeries(g) {
+    if (g.kind === "player") return D.pSeries;
+    if (g.kind === "club") return D.cSeries;
+    if (g.kind === "elo") return D.eloSeries;
+    if (g.kind === "brawler") return D.ps.filter((s) => s.b && s.b[g.brawler]).map((s) => [s.ts, s.b[g.brawler][0]]);
+    return [];
+  }
+  function goalTitle(g) {
+    if (g.kind === "player") return fmt(g.target) + " trophies";
+    if (g.kind === "club") return "Club at " + fmt(g.target);
+    if (g.kind === "elo") return fmt(g.target) + " Elo";
+    return brName(g.brawler) + " at " + fmt(g.target);
+  }
+  function renderGoals() {
+    const P = D.P, C = D.C;
+    const brOpts = P && P.b ? Object.keys(P.b).map((k) => [k, title(P.b[k][3])]).sort((a, b) => a[1].localeCompare(b[1])) : [];
+    const suggestions = [];
+    if (P) suggestions.push({ kind: "player", target: Math.ceil((P.p.trophies + 1) / 2500) * 2500 });
+    if (C) suggestions.push({ kind: "club", target: Math.ceil((C.c.trophies + 1) / 25000) * 25000 });
+    if (P && P.p.elo) suggestions.push({ kind: "elo", target: Math.ceil((P.p.elo + 1) / 250) * 250 });
+    const sugg = suggestions.filter((s) => !S.goals.some((g) => g.kind === s.kind && g.target === s.target));
+    const locked = !S.ownerCode;
+    const lock = locked
+      ? '<div class="card"><h2>Unlock goal editing</h2><form id="codeForm" class="row" novalidate><input class="input" id="ownerCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Owner code" aria-label="Owner code" style="flex:1;min-width:140px"><button class="btn" type="submit">Unlock</button></form>' +
+        '<div class="sub mt" id="codeMsg">Anyone with the link can see goals. Enter your owner code once on this device to add or remove them.</div></div>'
+      : "";
+    const form =
+      '<div class="card cut"><h2>New goal<span class="sp"></span>' + (locked ? "" : '<button class="link" data-act="lock">Lock</button>') + "</h2>" +
+        '<form id="goalForm" class="form" novalidate>' +
+          '<div class="field"><label for="gKind">Track</label><select class="input" id="gKind">' +
+            [["player", "My trophies"], ["club", "Club trophies"], ["brawler", "A brawler"], ["elo", "Ranked Elo"]].map(([v, l]) => '<option value="' + v + '"' + (S.goalKind === v ? " selected" : "") + ">" + l + "</option>").join("") +
+          "</select></div>" +
+          '<div class="field"><label for="gTarget">Target</label><input class="input num" id="gTarget" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 50000"></div>' +
+          '<div class="field full" id="gBrWrap"' + (S.goalKind === "brawler" ? "" : " hidden") + '><label for="gBrawler">Brawler</label><select class="input" id="gBrawler">' +
+            brOpts.map(([k, n]) => '<option value="' + esc(k) + '">' + esc(n) + " · " + fmt(P.b[k][0]) + "</option>").join("") +
+          "</select></div>" +
+          '<div class="full row"><button class="btn" type="submit"' + (!locked && !S.goalBusy ? "" : " disabled") + '>Add goal</button><span class="sub" id="gMsg"></span></div>' +
+        "</form>" +
+        (sugg.length && !locked ? '<div class="quick mt">' + sugg.map((s) => '<button class="btn ghost" data-quick="' + s.kind + ":" + s.target + '">+ ' + esc(goalTitle(s)) + "</button>").join("") + "</div>" : "") +
+      "</div>";
+    const cards = S.goals.slice().sort((a, b) => (a.created || 0) - (b.created || 0)).map((g) => {
+      const series = goalSeries(g), cur = series.length ? series[series.length - 1][1] : null;
+      const startV = g.start != null ? g.start : series.length ? series[0][1] : null;
+      const done = cur != null && cur >= g.target;
+      const pct = cur == null ? 0 : done ? 100 : startV != null && g.target > startV ? Math.max(0, Math.min(100, ((cur - startV) / (g.target - startV)) * 100)) : Math.max(0, Math.min(100, (cur / g.target) * 100));
+      const r = perDay(series, 7 * DAY);
+      let eta;
+      if (done) eta = "Reached";
+      else if (!r) eta = "ETA after a few more readings";
+      else if (r.rate <= 0) eta = "Not climbing right now";
+      else { const days = (g.target - cur) / r.rate; eta = days > 3650 ? "Over 10 years at this pace" : "ETA " + new Date(Date.now() + days * DAY).toLocaleDateString("en-US", { month: "short", day: "numeric", year: days > 300 ? "numeric" : undefined }) + " · " + (days < 1 ? "under a day" : Math.round(days) + " days"); }
+      const meter = g.kind === "club" ? "teal" : g.kind === "elo" ? "" : "hot";
+      const confirming = S.confirmDel === g.id;
+      return '<div class="card goal"><div class="gt"><h3>' + esc(goalTitle(g)) + '</h3><span class="chip ' + (done ? "up" : "hot") + '">' + Math.floor(pct) + "%</span></div>" +
+        '<div class="meter ' + meter + '"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+        '<div class="facts"><span>Now <b>' + fmt(cur) + "</b></span><span>" + (done ? "<b>Done</b>" : "<b>" + fmt(g.target - cur) + "</b> to go") + "</span>" + (r ? "<span><b>" + sgn(r.rate, Math.abs(r.rate) < 10 ? 1 : 0) + "</b>/day</span>" : "") + "</div>" +
+        '<div class="row" style="justify-content:space-between"><span class="sub">' + esc(eta) + "</span>" +
+          (locked ? "" : confirming ? '<span class="row"><button class="btn ghost" data-del-cancel="1">Keep</button><button class="btn danger" data-del="' + esc(g.id) + '">Delete</button></span>' : '<button class="btn ghost" data-del-ask="' + esc(g.id) + '">Remove</button>') +
+        "</div></div>";
+    });
+    return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>');
+  }
+
+  function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + esc(msg) + "</div></div>"; }
+
+  // ---------- render ----------
+  const RENDER = { me: renderMe, club: renderClub, brawlers: renderBrawlers, goals: renderGoals };
+  function render() {
+    if (!S.loaded) return;
+    derive();
+    $("#skel").hidden = true;
+    const P = D.P, C = D.C;
+    if (P) $("#hName").textContent = P.p.name || "bboscox";
+    $("#hSub").textContent = "Player // #" + ME;
+    const btn = $("#refreshBtn");
+    btn.classList.toggle("busy", S.live.busy);
+    btn.classList.toggle("stale", !S.live.busy && (!D.lastTs || Date.now() - D.lastTs > 2 * HOUR));
+    $("#syncTxt").textContent = S.live.busy ? "Syncing" : D.lastTs ? "Synced " + agoShort(D.lastTs) : "No data";
+    const rb = $("#rangeBar");
+    rb.hidden = S.tab !== "me";
+    if (S.tab === "me") rb.innerHTML = ["24h", "7d", "30d", "all"].map((k) => '<button data-seg="me" data-v="' + k + '" aria-pressed="' + (S.r.me === k) + '">' + RANGE_LABEL[k] + "</button>").join("");
+    document.documentElement.style.setProperty("--hdr-h", ($(".top").offsetHeight || 120) + "px");
+    for (const sec of document.querySelectorAll("section[data-tab]")) sec.hidden = sec.dataset.tab !== S.tab;
+    const sec = $('section[data-tab="' + S.tab + '"]');
+    const active = document.activeElement && document.activeElement.id;
+    const caret = active === "brSearch" ? document.activeElement.selectionStart : null;
+    charts.length = 0;
+    sec.innerHTML = RENDER[S.tab]();
+    flushCharts();
+    for (const b of document.querySelectorAll(".tabbar button")) { if (b.dataset.go === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
+    if (active === "brSearch") { const el = $("#brSearch"); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) {} } }
+  }
+
+  // ---------- banner ----------
+  function showBanner(html, action) {
+    $("#banner").innerHTML = html ? '<div class="banner"><div>' + html + "</div>" + (action ? '<button class="btn ghost" data-act="' + action.act + '">' + esc(action.label) + "</button>" : "") + "</div>" : "";
+  }
+
+  // ---------- live refresh ----------
+  async function refreshLive() {
+    if (S.live.busy) return;
+    S.live.busy = true; render();
+    try {
+      const res = await callFn({ action: "refresh", src: "live" });
+      await loadData(false);
+      showBanner(res.player_error ? "<b>Your player stats didn't update this time.</b> " + esc(String(res.player_error).slice(0, 140)) : "", res.player_error ? { act: "retry", label: "Retry" } : null);
+    } catch (e) {
+      try { await loadData(!S.readings.length); } catch (e2) {}
+      showBanner(navigator.onLine === false
+        ? "<b>You're offline.</b> Showing your last saved stats."
+        : "<b>Couldn't refresh just now.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" });
+    } finally {
+      S.live.busy = false; S.live.at = Date.now(); render();
+    }
+  }
+
+  // ---------- events ----------
+  document.addEventListener("click", (ev) => {
+    const t = ev.target.closest("button");
+    if (!t) return;
+    if (t.dataset.go) { S.tab = t.dataset.go; try { localStorage.setItem("tab", S.tab); } catch (e) {} render(); window.scrollTo({ top: 0 }); return; }
+    if (t.dataset.seg) {
+      const g = t.dataset.seg, v = t.dataset.v;
+      if (g in S.r) S.r[g] = v; else if (g === "bType") S.bType = v; else if (g === "brSort") S.brSort = v; else if (g === "memSort") S.memSort = v; else if (g === "chart") S.chartMode = v;
+      if (g === "me" || g === "chart") { try { localStorage.setItem("prefs", JSON.stringify({ range: S.r.me, chart: S.chartMode })); } catch (e) {} }
+      render(); return;
+    }
+    if (t.dataset.toggle) { S.open[t.dataset.toggle] = !S.open[t.dataset.toggle]; render(); return; }
+    if (t.dataset.jump) {
+      const el = document.getElementById(t.dataset.jump) || document.getElementById("sec-battles");
+      const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (el) el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+      return;
+    }
+    if (t.dataset.br) { S.openBrawler = S.openBrawler === t.dataset.br ? null : t.dataset.br; render(); return; }
+    if (t.id === "refreshBtn" || t.dataset.act === "retry" || t.dataset.act === "allow") { refreshLive(); return; }
+    if (t.dataset.act === "maps") { S.showAllMaps = !S.showAllMaps; render(); return; }
+    if (t.dataset.act === "log") { S.showAllLog = !S.showAllLog; render(); return; }
+    if (t.dataset.quick) { const [kind, target] = t.dataset.quick.split(":"); addGoal({ kind, target: +target }); return; }
+    if (t.dataset.delAsk) { S.confirmDel = t.dataset.delAsk; render(); return; }
+    if (t.dataset.delCancel) { S.confirmDel = null; render(); return; }
+    if (t.dataset.del) { const id = t.dataset.del; S.confirmDel = null; goalCall({ action: "goal_delete", id }); return; }
+    if (t.dataset.act === "lock") { S.ownerCode = null; try { localStorage.removeItem("ownerCode"); } catch (e) {} render(); return; }
+  });
+  document.addEventListener("input", (ev) => {
+    if (ev.target.id === "brSearch") { S.brQuery = ev.target.value; render(); }
+  });
+  document.addEventListener("change", (ev) => {
+    if (ev.target.id === "gKind") { S.goalKind = ev.target.value; const w = $("#gBrWrap"); if (w) w.hidden = S.goalKind !== "brawler"; }
+  });
+  document.addEventListener("submit", (ev) => {
+    if (ev.target.id === "codeForm") { ev.preventDefault(); unlock($("#ownerCode").value); return; }
+    if (ev.target.id !== "goalForm") return;
+    ev.preventDefault();
+    const target = Math.round(+$("#gTarget").value);
+    const msg = $("#gMsg");
+    if (!target || target < 1) { msg.textContent = "Enter a target number."; return; }
+    const g = { kind: S.goalKind, target };
+    if (g.kind === "brawler") g.brawler = $("#gBrawler").value;
+    addGoal(g);
+  });
+  async function goalCall(body) {
+    if (!S.ownerCode || S.goalBusy) return;
+    S.goalBusy = true; render();
+    try {
+      await callFn(Object.assign({ code: S.ownerCode }, body));
+      await loadData(false);
+      showBanner("");
+    } catch (e) {
+      if (e.code === "wrong_code") {
+        S.ownerCode = null;
+        try { localStorage.removeItem("ownerCode"); } catch (x) {}
+        showBanner("<b>That owner code no longer works.</b> Enter it again on the Goals tab.");
+      } else {
+        showBanner("<b>Couldn't save that change.</b> " + esc(String((e && e.message) || e).slice(0, 140)));
+      }
+    } finally {
+      S.goalBusy = false; render();
+    }
+  }
+  function addGoal(g) { return goalCall({ action: "goal_add", kind: g.kind, target: g.target, brawler: g.brawler }); }
+  async function unlock(raw) {
+    const msg = $("#codeMsg"), code = String(raw || "").trim();
+    if (!code) { if (msg) msg.textContent = "Enter your owner code."; return; }
+    if (msg) msg.textContent = "Checking…";
+    try {
+      const r = await callFn({ action: "check_code", code });
+      if (r.ok) {
+        S.ownerCode = code;
+        try { localStorage.setItem("ownerCode", code); } catch (e) {}
+        render();
+      } else if (msg) msg.textContent = "That code isn't right. Check it and try again.";
+    } catch (e) {
+      if (msg) msg.textContent = "Couldn't check the code right now. Try again in a moment.";
+    }
+  }
+  let rT = null;
+  window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(render, 150); });
+
+  // ---------- boot ----------
+  try { const t = localStorage.getItem("tab"); if (t && RENDER[t]) S.tab = t; } catch (e) {}
+  try {
+    const pr = JSON.parse(localStorage.getItem("prefs") || "{}");
+    if (pr && RANGES[pr.range]) S.r.me = pr.range;
+    if (pr && (pr.chart === "time" || pr.chart === "battle")) S.chartMode = pr.chart;
+  } catch (e) {}
+  const h = (location.hash || "").slice(1); if (RENDER[h]) S.tab = h; else if (h === "battles") S.tab = "me";
+
+  async function boot() {
+    try { S.ownerCode = localStorage.getItem("ownerCode") || null; } catch (e) {}
+    try { await loadData(true); }
+    catch (e) { showBanner("<b>Couldn't load your stats.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" }); }
+    S.loaded = true;
+    render();
+    const due = () => document.visibilityState === "visible" && !S.live.busy && Date.now() - Math.max(S.live.at, D ? D.lastTs : 0) > 10 * 60e3;
+    if (due()) refreshLive();
+    setInterval(() => { if (due()) refreshLive(); }, 60e3);
+    document.addEventListener("visibilitychange", () => { if (due()) refreshLive(); });
+    setInterval(() => { if (document.visibilityState === "visible") render(); }, 60e3);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

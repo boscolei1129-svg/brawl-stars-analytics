@@ -2361,7 +2361,8 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   function leaveIntro() {
     const el = $("#intro"); if (!el) return;
     el.classList.add("leaving");
-    setTimeout(() => { el.remove(); showTour(); }, REDUCED() ? 0 : 420);
+    // Someone replaying it with a player already open finishes back on that player.
+    setTimeout(() => { el.remove(); showTour({ replay: !!ME }); }, REDUCED() ? 0 : 420);
   }
 
   const ICON = {

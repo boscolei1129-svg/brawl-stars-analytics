@@ -25,7 +25,8 @@ create table public.battles (
   win boolean,
   tc integer,                     -- trophy change
   brawler text,
-  ranked boolean not null default false
+  ranked boolean not null default false,
+  event_id bigint                 -- the game's id for the mode + map (used for map pictures)
 );
 
 create table public.goals (

@@ -39,3 +39,4 @@ update settings set value = encode(sha256(convert_to('NEWCODE', 'UTF8')), 'hex')
 - Solo Showdown counts a top-5 finish as a win, as BrawlTime does.
 - A free Supabase project can pause after a week without activity. The cron job's calls should keep it awake. If it ever pauses, restore it from the Supabase dashboard.
 - Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`).
+- Game art is loaded from Brawlify and BrawlTime. This app is unofficial and not endorsed by Supercell; see Supercell's Fan Content Policy.

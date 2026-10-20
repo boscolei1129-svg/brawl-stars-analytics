@@ -78,7 +78,7 @@ async function liveMembers(club: any): Promise<Set<string>> {
     for (let m = queue.shift(); m; m = queue.shift()) {
       try {
         const p = await officialGet(`/players/${encodeURIComponent("#" + m[0])}`);
-        if (p && typeof p.trophies === "number") { m[3] = p.trophies; done.add(m[0]); }
+        if (p && typeof p.trophies === "number") { m[3] = p.trophies; if (p.icon?.id) m[4] = p.icon.id; done.add(m[0]); }
       } catch (_e) { /* keep the club list's number for this member */ }
     }
   };
@@ -104,10 +104,11 @@ function compactPlayer(d: any) {
     v3: d["3vs3Victories"], solo: d.soloVictories, duo: d.duoVictories, exp: d.expLevel, prestige: d.totalPrestigeLevel,
     rankName: d.rankedRankName, elo: d.rankedElo, seasonBestElo: d.highestSeasonRankedElo, bestElo: d.highestAllTimeRankedElo,
     bestRankName: d.highestAllTimeRankedRankName, club: d.club?.name ?? null, clubTag: strip(d.club?.tag),
+    icon: d.icon?.id ?? null, rank: d.rankedRank ?? null, bestRank: d.highestAllTimeRankedRank ?? null,
   };
   const brawlers: Record<string, unknown[]> = {};
   for (const [k, v] of Object.entries<any>(d.brawlers ?? {})) {
-    brawlers[k] = [v.trophies, v.highestTrophies, v.power, v.name, v.prestigeLevel ?? 0, v.maxWinStreak ?? 0, v.currentWinStreak ?? 0];
+    brawlers[k] = [v.trophies, v.highestTrophies, v.power, v.name, v.prestigeLevel ?? 0, v.maxWinStreak ?? 0, v.currentWinStreak ?? 0, v.id ?? null];
   }
   const battles = (d.battles ?? []).map((x: any) => {
     let me: any = null;
@@ -115,14 +116,14 @@ function compactPlayer(d: any) {
     return {
       t: new Date(x.timestamp).toISOString(), mode: x.event?.mode ?? null, map: x.event?.map ?? null,
       result: x.result ?? null, win: typeof x.victory === "boolean" ? x.victory : null,
-      tc: x.trophyChange ?? null, brawler: me?.brawler ?? null, ranked: !!x.ranked,
+      tc: x.trophyChange ?? null, brawler: me?.brawler ?? null, ranked: !!x.ranked, event_id: x.event?.id ?? null,
     };
   }).filter((b: any) => b.t && !b.t.startsWith("Invalid"));
   return { player, brawlers, battles };
 }
 
 function compactClub(c: any, src: string) {
-  const members = (c.members ?? []).map((m: any) => [strip(m.tag), m.name, m.role, m.trophies]);
+  const members = (c.members ?? []).map((m: any) => [strip(m.tag), m.name, m.role, m.trophies, m.icon?.id ?? null]);
   return {
     name: c.name, tag: strip(c.tag), trophies: c.trophies, req: c.requiredTrophies, type: c.type, desc: c.description,
     members, src,
@@ -166,11 +167,11 @@ function applyClub(base: any, c: any) {
   if (!c?.d) return c;
   if (!base) return null;
   const upd = new Map((c.upd ?? []).map((u: any[]) => [u[0], u[1]]));
-  return { ...base, trophies: c.trophies, members: base.members.map((m: any[]) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0])] : m)) };
+  return { ...base, trophies: c.trophies, members: base.members.map((m: any[]) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0]), m[4] ?? null] : m)) };
 }
 function clubChange(full: any, club: any) {
   const same = (a: any, b: any) => stable(a) === stable(b);
-  const details = (c: any) => [c.name, c.tag, c.req, c.type, c.desc, c.src, c.members.map((m: any[]) => [m[0], m[1], m[2]]).sort()];
+  const details = (c: any) => [c.name, c.tag, c.req, c.type, c.desc, c.src, c.members.map((m: any[]) => [m[0], m[1], m[2], m[4] ?? null]).sort()];
   if (!full || !same(details(full), details(club))) return club;
   const old = new Map(full.members.map((m: any[]) => [m[0], m[3]]));
   const upd = club.members.filter((m: any[]) => old.get(m[0]) !== m[3]).map((m: any[]) => [m[0], m[3]]);
@@ -219,7 +220,8 @@ async function refresh(src: string) {
   if (pr.status === "fulfilled") {
     const { player, brawlers, battles } = compactPlayer(pr.value);
     if (battles.length) {
-      const { error } = await sb.from("battles").upsert(battles, { onConflict: "t", ignoreDuplicates: true });
+      // Re-saving known battles is harmless (same data) and fills in details added later, like the map's id.
+      const { error } = await sb.from("battles").upsert(battles, { onConflict: "t" });
       if (error) throw error;
       saved = battles.length;
     }

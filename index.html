@@ -272,7 +272,9 @@ section[data-tab] { display: grid; gap: 12px; }
 .goal .facts b { color: var(--fg); }
 .quick { display: flex; flex-wrap: wrap; gap: 8px; }
 .note { color: var(--muted); font-size: 12.5px; line-height: 1.5; padding: 0 2px; }
-.skel { color: var(--muted); padding: 32px 4px; text-align: center; font-family: var(--font-num); font-size: 12.5px; letter-spacing: 1px; text-transform: uppercase; }
+.skel { display: grid; gap: 12px; padding: 2px 0; }
+.sk { border: 1px solid var(--line); background: linear-gradient(90deg, var(--surface) 0%, var(--raise) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.sk.a { height: 128px; } .sk.b { height: 46px; } .sk.c { height: 150px; } .sk.d { height: 230px; }
 
 /* Tab bar */
 .tabbar {
@@ -313,6 +315,39 @@ section[data-tab] { display: grid; gap: 12px; }
   .rangebar { max-width: 520px; }
   .tabbar nav { max-width: 720px; }
 }
+/* Game art: pictures sit on top of the initials, which show if a picture can't load. */
+.mono { overflow: visible; }
+.mono .art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mono .pow { z-index: 1; }
+.mono.sm { width: 34px; height: 34px; font-size: 11px; }
+.mono.ico .art { object-fit: contain; padding: 4px; }
+.mono.av { width: 42px; height: 42px; }
+.log { grid-template-columns: 40px 34px minmax(0, 1fr) auto; }
+.res { width: auto; }
+.rankrow { display: flex; align-items: center; gap: 14px; }
+.rankart { width: 58px; height: 58px; object-fit: contain; flex: none; }
+
+/* Motion */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes glow { 0% { text-shadow: 0 0 0 transparent; } 25% { text-shadow: 0 0 22px currentColor; } 100% { text-shadow: 0 0 0 transparent; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.enter-item { animation: rise 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.bump { animation: glow 1.2s ease-out; }
+svg .line.draw { animation: draw 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) forwards; }
+svg .area.draw { animation: areain 0.9s ease-out both; }
+@keyframes areain { from { opacity: 0; } to { opacity: 0.08; } }
+svg .ring.draw { animation: fadein 0.3s 0.75s ease-out both; }
+button { transition: transform 0.12s ease, background-color 0.15s ease, color 0.15s ease; -webkit-tap-highlight-color: transparent; }
+button:active { transform: scale(0.97); }
+.lib > .li:active, .coll-h:active { transform: scale(0.99); }
+.tabbar button, .seg button, .jump button, .rangebar button, .sync { -webkit-user-select: none; user-select: none; }
+@media (prefers-reduced-motion: reduce) {
+  .enter-item, .bump, svg .draw, .sk { animation: none !important; }
+  svg .line.draw { stroke-dashoffset: 0 !important; }
+  button:active, .lib > .li:active, .coll-h:active { transform: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .sync.busy i { animation: none; }
 }
@@ -323,6 +358,7 @@ section[data-tab] { display: grid; gap: 12px; }
 <div class="wrap">
   <header class="top">
     <div class="top-row">
+      <span class="mono av" id="hAvatar" hidden></span>
       <div class="who">
         <span class="k-label" id="hSub">Player // #8YRJ090Q2</span>
         <h1 id="hName">bboscox</h1>
@@ -333,7 +369,7 @@ section[data-tab] { display: grid; gap: 12px; }
   </header>
   <div id="banner"></div>
   <main id="main">
-    <div class="skel" id="skel">Loading your stats…</div>
+    <div class="skel" id="skel" role="status" aria-label="Loading your stats"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><div class="sk d"></div></div>
     <section data-tab="me" hidden></section>
     <section data-tab="club" hidden></section>
     <section data-tab="brawlers" hidden></section>
@@ -404,6 +440,18 @@ section[data-tab] { display: grid; gap: 12px; }
   const roleName = { president: "President", vicePresident: "Vice President", senior: "Senior", member: "Member" };
   const roleShort = { president: "Pres", vicePresident: "VP", senior: "Senior", member: "Member" };
   const brName = (k) => { const b = D && D.P && D.P.b && D.P.b[k]; return b ? title(b[3]) : title(String(k || "?").replace(/_+/g, " ")); };
+  // ---------- game art (Brawlify / BrawlTime image hosts; initials show when a picture is missing) ----------
+  const ART = {
+    brawler: (key) => {
+      const b = D && D.P && D.P.b && D.P.b[key];
+      return b && b[7] ? "https://cdn.brawlify.com/brawlers/borderless/" + b[7] + ".png" : key ? "https://media.brawltime.ninja/brawlers/" + encodeURIComponent(key) + "/avatar.webp?size=160" : null;
+    },
+    mode: (m) => (m ? "https://media.brawltime.ninja/modes/" + String(m).replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase() + "/icon.webp?size=80" : null),
+    map: (id) => (id ? "https://media.brawltime.ninja/maps/" + id + ".webp?size=160" : null),
+    rank: (r) => (r ? "https://cdn.brawlify.com/ranked/tiered/" + (58000000 + r - 1) + ".png" : null),
+    icon: (id) => (id ? "https://cdn.brawlify.com/profile-icons/regular/" + id + ".png" : null),
+  };
+  const art = (src) => (src ? '<img class="art" src="' + esc(src) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : "");
   const initials = (name) => { const w = String(name).replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/); return ((w[0] || "?")[0] + (w[1] ? w[1][0] : (w[0] || "")[1] || "")).toUpperCase(); };
   const outcome = (b) => {
     if (/draw/i.test(b.r || "")) return "d";
@@ -498,7 +546,7 @@ section[data-tab] { display: grid; gap: 12px; }
     if (!c.d) return c;
     if (!base) return null;
     const upd = new Map((c.upd || []).map((u) => [u[0], u[1]]));
-    return Object.assign({}, base, { trophies: c.trophies, members: base.members.map((m) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0])] : m)) });
+    return Object.assign({}, base, { trophies: c.trophies, members: base.members.map((m) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0]), m[4]] : m)) });
   }
   function derive() {
     if (D && D.ver === S.ver) return;
@@ -519,7 +567,7 @@ section[data-tab] { display: grid; gap: 12px; }
       // Club lists are saved in full when members or details change, otherwise only the members whose trophies moved.
       if (r.club || r.club_upd) { curC = applyClub(curC, r.club || r.club_upd); if (curC) cs.push({ ts, c: curC }); }
     }
-    const battles = S.battleRows.map((b) => ({ t: msOf(b.t), m: b.mode, map: b.map, r: b.result, w: b.win, tc: b.tc, br: b.brawler, rk: !!b.ranked }))
+    const battles = S.battleRows.map((b) => ({ t: msOf(b.t), m: b.mode, map: b.map, r: b.result, w: b.win, tc: b.tc, br: b.brawler, rk: !!b.ranked, ev: b.event_id || null }))
       .filter((b) => !isNaN(b.t)).sort((a, b) => b.t - a.t);
     const tro = trophySeries(ticks, battles);
     D = {
@@ -638,16 +686,19 @@ section[data-tab] { display: grid; gap: 12px; }
       const line = pts.map((p, i) => (i ? "L" : "M") + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join(" ");
       const base = sy(o.zero ? Math.max(sc.min, Math.min(0, sc.max)) : sc.min).toFixed(1);
       const area = line + " L" + sx(pts[pts.length - 1][0]).toFixed(1) + " " + base + " L" + sx(pts[0][0]).toFixed(1) + " " + base + " Z";
-      g += '<path d="' + area + '" style="fill:' + color + ';opacity:.08;stroke:none"/>';
-      g += '<path d="' + line + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:miter"/>';
+      const dc = S.drawAnim ? " draw" : "";
+      g += '<path class="area' + dc + '" d="' + area + '" style="fill:' + color + ';opacity:.08;stroke:none"/>';
+      g += '<path class="line' + dc + '" d="' + line + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:miter"/>';
     }
     const lp = pts[pts.length - 1];
-    g += '<rect class="ring" x="' + (sx(lp[0]) - 4).toFixed(1) + '" y="' + (sy(lp[1]) - 4).toFixed(1) + '" width="8" height="8" style="fill:' + color + '"/>';
+    g += '<rect class="ring' + (S.drawAnim && pts.length > 1 ? " draw" : "") + '" x="' + (sx(lp[0]) - 4).toFixed(1) + '" y="' + (sy(lp[1]) - 4).toFixed(1) + '" width="8" height="8" style="fill:' + color + '"/>';
     g += '<line class="xh" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" visibility="hidden"/>';
     g += '<rect class="ring hd" width="8" height="8" style="fill:' + color + '" visibility="hidden"/>';
     g += '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:transparent"/>';
     host.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(o.label || "Chart") + '">' + g + '</svg><div class="tip" hidden></div>';
     const svg = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = svg.querySelector(".xh"), hd = svg.querySelector(".hd");
+    const ln = svg.querySelector(".line.draw");
+    if (ln && ln.getTotalLength) { const len = Math.ceil(ln.getTotalLength()); ln.style.strokeDasharray = len; ln.style.strokeDashoffset = len; }
     const show = (ev) => {
       const r = svg.getBoundingClientRect();
       const px = ((ev.clientX - r.left) / r.width) * W;
@@ -687,7 +738,7 @@ section[data-tab] { display: grid; gap: 12px; }
   };
   const logRow = (b) => {
     const nm = b.br ? brName(b.br) : modeName(b.m);
-    return '<div class="log"><span class="res ' + resCls(b) + '">' + esc(resLabel(b)) + '</span><div style="min-width:0"><div class="nm">' + esc(nm) + '</div><div class="ds">' + esc(modeName(b.m) + " · " + (b.map || "") + " · " + ago(b.t)) + (b.rk ? " · Ranked" : "") + '</div></div><span class="tc ' + tcls(b.tc) + '">' + (b.tc == null ? "—" : sgn(b.tc)) + "</span></div>";
+    return '<div class="log"><span class="res ' + resCls(b) + '">' + esc(resLabel(b)) + '</span><span class="mono sm">' + art(b.br ? ART.brawler(b.br) : ART.mode(b.m)) + esc(initials(nm)) + '</span><div style="min-width:0"><div class="nm">' + esc(nm) + '</div><div class="ds">' + esc(modeName(b.m) + " · " + (b.map || "") + " · " + ago(b.t)) + (b.rk ? " · Ranked" : "") + '</div></div><span class="tc ' + tcls(b.tc) + '">' + (b.tc == null ? "—" : sgn(b.tc)) + "</span></div>";
   };
 
   // ---------- tabs ----------
@@ -744,7 +795,7 @@ section[data-tab] { display: grid; gap: 12px; }
     return (
       '<div class="card cut" id="sec-overview">' +
         '<div class="hud-k k-label"><span>Trophies</span><span>' + esc(((D.C && D.C.c.name) || p.club || "") + (myRole ? " · " + (roleShort[myRole] || myRole) : "")) + "</span></div>" +
-        '<div class="hero-num">' + fmt(p.trophies) + "</div>" +
+        '<div class="hero-num" data-k="me" data-v="' + p.trophies + '">' + fmt(p.trophies) + "</div>" +
         '<div class="hud-sub"><span>Peak ' + fmt(p.highest) + "</span>" +
           (p.trophies >= p.highest ? '<span class="up-t">At peak</span>' : "<span>" + fmt(p.highest - p.trophies) + " off peak</span>") +
           (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
@@ -769,7 +820,7 @@ section[data-tab] { display: grid; gap: 12px; }
       battlesSection() +
       '<div class="sec-label" id="sec-career">Career</div>' +
       '<div class="card"><h2>Ranked<span class="sp"></span>' + (eloC ? '<span class="aside ' + tcls(eloC.delta) + '">' + sgn(eloC.delta) + " Elo · " + RANGE_LABEL[rk] + "</span>" : "") + "</h2>" +
-        '<div style="font-weight:700;font-size:22px;letter-spacing:1px;text-transform:uppercase">' + esc(p.rankName || "Unranked") + '</div><div class="sub num">' + fmt(p.elo) + " Elo</div>" +
+        '<div class="rankrow">' + (p.rank ? '<img class="rankart" src="' + esc(ART.rank(p.rank)) + '" alt="" loading="lazy" onerror="this.remove()">' : "") + '<div><div style="font-weight:700;font-size:22px;letter-spacing:1px;text-transform:uppercase">' + esc(p.rankName || "Unranked") + '</div><div class="sub num">' + fmt(p.elo) + " Elo</div></div></div>" +
         '<div class="tiles two mt"><div class="tile"><div class="k">Season best</div><div class="v">' + fmt(p.seasonBestElo) + '</div></div><div class="tile"><div class="k">All-time best</div><div class="v">' + fmt(p.bestElo) + '</div><div class="n">' + esc(p.bestRankName || "") + "</div></div></div>" +
       "</div>" +
       '<div class="card"><h2>Victories<span class="sp"></span><span class="aside">gained · ' + RANGE_LABEL[rk] + "</span></h2>" +
@@ -778,7 +829,7 @@ section[data-tab] { display: grid; gap: 12px; }
         "</div>" +
         '<div class="hud-sub mt"><span>Level ' + fmt(p.exp) + "</span><span>Prestige " + fmt(p.prestige) + "</span><span>" + Object.keys(P.b || {}).length + " brawlers</span></div>" +
       "</div>" +
-      '<p class="note">Stats come from BrawlTime Ninja\'s public feed. Your server saves a reading every 15 minutes, and the app pulls a fresh one when you open it or tap the sync pill.</p>'
+      '<p class="note">Stats come from BrawlTime Ninja and the official Brawl Stars API. Your server saves a reading every 15 minutes, and the app pulls a fresh one when you open it or tap the sync pill. Game art via Brawlify and BrawlTime. This app is unofficial and not endorsed by Supercell; see Supercell\'s Fan Content Policy.</p>'
     );
   }
 
@@ -813,12 +864,13 @@ section[data-tab] { display: grid; gap: 12px; }
       for (const b of list) { const k = keyFn(b); if (!m.has(k)) m.set(k, []); m.get(k).push(b); }
       return [...m.entries()].map(([k, v]) => ({ k, s: wlStats(v), mode: v[0].m })).sort((a, b) => b.s.n - a.s.n);
     };
-    const statRow = (name, sub, s) =>
-      '<div class="li"><div class="main"><div class="t1">' + esc(name) + '</div><div class="t2">' + esc(sub) + '</div><div class="meter hot"><i style="width:' + (s.rate == null ? 0 : pct100(s.rate)) + '%"></i></div></div>' +
+    const statRow = (name, sub, s, lead) =>
+      '<div class="li">' + (lead || "") + '<div class="main"><div class="t1">' + esc(name) + '</div><div class="t2">' + esc(sub) + '</div><div class="meter hot"><i style="width:' + (s.rate == null ? 0 : pct100(s.rate)) + '%"></i></div></div>' +
       '<div class="end"><div class="big">' + (s.rate == null ? "—" : pct100(s.rate) + "%") + '</div><div class="t2 ' + tcls(s.net) + '">' + sgn(s.net) + "</div></div></div>";
     const modes = group((b) => b.m || "unknown");
     const maps = group((b) => (b.map || "Unknown map") + "|" + (b.m || ""));
     const mapsShown = S.showAllMaps ? maps : maps.slice(0, 6);
+    const mapIds = new Map(); for (const b of D.battles) if (b.ev && b.map && !mapIds.has(b.map)) mapIds.set(b.map, b.ev);
     const pct = (s) => (s.rate == null ? "—" : pct100(s.rate) + "%");
     const more = (n) => (n > 0 ? " · +" + n + " more" : "");
     const coll = (key, id, label, summary, body) => {
@@ -839,9 +891,9 @@ section[data-tab] { display: grid; gap: 12px; }
         '<div class="sub mt">' + esc(streakText(all)) + ". Solo Showdown counts a top-5 finish as a win, as BrawlTime does.</div>" +
       "</div>" +
       coll("modes", "sec-modes", "By mode", modeName(top.k) + " · " + pct(top.s) + " · " + top.s.n + " battles" + more(modes.length - 1),
-        '<div class="list">' + modes.map((g) => statRow(modeName(g.k), g.s.w + "W · " + g.s.l + "L" + (g.s.d ? " · " + g.s.d + "D" : "") + " · " + g.s.n + " battles", g.s)).join("") + "</div>") +
+        '<div class="list">' + modes.map((g) => statRow(modeName(g.k), g.s.w + "W · " + g.s.l + "L" + (g.s.d ? " · " + g.s.d + "D" : "") + " · " + g.s.n + " battles", g.s, '<span class="mono ico">' + art(ART.mode(g.k)) + esc(initials(modeName(g.k))) + "</span>")).join("") + "</div>") +
       coll("maps", "", "By map", topMap.k.split("|")[0] + " · " + pct(topMap.s) + " · " + topMap.s.n + " battles" + more(maps.length - 1),
-        '<div class="list">' + mapsShown.map((g) => statRow(g.k.split("|")[0], modeName(g.mode) + " · " + g.s.w + "W · " + g.s.l + "L · " + g.s.n + " battles", g.s)).join("") + "</div>" +
+        '<div class="list">' + mapsShown.map((g) => statRow(g.k.split("|")[0], modeName(g.mode) + " · " + g.s.w + "W · " + g.s.l + "L · " + g.s.n + " battles", g.s, '<span class="mono">' + art(ART.map(mapIds.get(g.k.split("|")[0])) || ART.mode(g.mode)) + esc(initials(g.k.split("|")[0])) + "</span>")).join("") + "</div>" +
         (maps.length > 6 ? '<button class="link mt" data-act="maps">' + (S.showAllMaps ? "Show fewer" : "Show all " + maps.length) + "</button>" : "")) +
       coll("log", "sec-log", "Match log · " + list.length + " saved", "Latest: " + resLabel(last) + " with " + (last.br ? brName(last.br) : modeName(last.m)) + " · " + (last.tc == null ? "—" : sgn(last.tc)) + " · " + when(last.t),
         '<div class="list">' + list.slice(0, S.showAllLog ? 200 : 10).map(logRow).join("") + "</div>" +
@@ -874,7 +926,7 @@ section[data-tab] { display: grid; gap: 12px; }
       "</div>" +
       '<div class="card"><h2>Biggest climbers · ' + RANGE_LABEL[S.r.climb] + "</h2>" +
         (climbers.length
-          ? '<div class="list">' + climbers.map((c) => '<div class="li"><div class="mono">' + esc(initials(brName(c.k))) + '</div><div class="main"><div class="t1">' + esc(brName(c.k)) + '</div><div class="t2 num">' + fmt(P.b[c.k][0]) + ' trophies</div></div><div class="end"><span class="chip up">' + sgn(c.g) + "</span></div></div>").join("") + "</div>"
+          ? '<div class="list">' + climbers.map((c) => '<div class="li"><div class="mono">' + art(ART.brawler(c.k)) + esc(initials(brName(c.k))) + '</div><div class="main"><div class="t1">' + esc(brName(c.k)) + '</div><div class="t2 num">' + fmt(P.b[c.k][0]) + ' trophies</div></div><div class="end"><span class="chip up">' + sgn(c.g) + "</span></div></div>").join("") + "</div>"
           : '<div class="sub">No brawler has gained trophies in this range yet' + (partial ? " (tracking started " + esc(dtShort(D.firstTs)) + ")" : "") + ".</div>") +
       "</div>" +
       '<div class="card">' +
@@ -885,7 +937,7 @@ section[data-tab] { display: grid; gap: 12px; }
             const open = S.openBrawler === r.k, st = wlStats(r.pl), b = P.b[r.k];
             return '<div class="lib"><button class="li" data-br="' + esc(r.k) + '" aria-expanded="' + open + '">' +
               '<span class="rank">' + (i + 1) + "</span>" +
-              '<span class="mono' + (r.pow >= 11 ? " p11" : "") + '">' + esc(initials(r.name)) + '<span class="pow">P' + r.pow + "</span></span>" +
+              '<span class="mono' + (r.pow >= 11 ? " p11" : "") + '">' + art(ART.brawler(r.k)) + esc(initials(r.name)) + '<span class="pow">P' + r.pow + "</span></span>" +
               '<span class="main"><span class="t1" style="display:block">' + esc(r.name) + '</span><span class="t2" style="display:block">Best ' + fmt(r.hi) + (r.pl.length ? " · " + r.pl.length + " played" : "") + "</span></span>" +
               '<span class="end"><span class="big" style="display:block">' + fmt(r.tr) + '</span><span class="t2 ' + (r.g == null ? "flat-t" : tcls(r.g)) + '" style="display:block">' + (r.g == null ? "new" : sgn(r.g)) + "</span></span>" +
             "</button>" +
@@ -909,7 +961,7 @@ section[data-tab] { display: grid; gap: 12px; }
     const base = snapAt(D.cs, Date.now() - RANGES[S.r.members]);
     const baseMap = new Map(((base && base.c.members) || []).map((m) => [m[0], m[3]]));
     const covered = base ? (Date.now() - base.ts) / DAY : 0;
-    const rows = c.members.map((m) => ({ tag: m[0], name: m[1], role: m[2], tr: m[3], g: baseMap.has(m[0]) ? m[3] - baseMap.get(m[0]) : null }));
+    const rows = c.members.map((m) => ({ tag: m[0], name: m[1], role: m[2], tr: m[3], icon: m[4], g: baseMap.has(m[0]) ? m[3] - baseMap.get(m[0]) : null }));
     const byTrophies = rows.slice().sort((a, b) => b.tr - a.tr);
     const sorted = S.memSort === "gain" ? rows.slice().sort((a, b) => (b.g ?? -1e9) - (a.g ?? -1e9) || b.tr - a.tr) : byTrophies;
     const nowTags = new Set(rows.map((r) => r.tag));
@@ -922,7 +974,7 @@ section[data-tab] { display: grid; gap: 12px; }
     return (
       '<div class="card cut">' +
         '<div class="hud-k k-label"><span>' + esc(c.name) + " // #" + esc(c.tag) + "</span><span>" + c.members.length + "/30</span></div>" +
-        '<div class="hero-num teal">' + fmt(c.trophies) + "</div>" +
+        '<div class="hero-num teal" data-k="club" data-v="' + c.trophies + '">' + fmt(c.trophies) + "</div>" +
         '<div class="hud-sub">' + (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
           "<span>" + esc(c.type || "") + "</span><span>" + fmt(c.req) + "+ to join</span></div>" +
         (c.desc ? '<div class="sub mt">' + esc(c.desc) + "</div>" : "") +
@@ -949,7 +1001,7 @@ section[data-tab] { display: grid; gap: 12px; }
         '<div class="list">' +
           sorted.map((r, i) => {
             const inactive = canInactive && r.g === 0;
-            return '<div class="li"><span class="rank">' + (i + 1) + '</span><div class="main"><div class="t1">' + esc(r.name) + (r.tag === ME ? '<span class="you">YOU</span>' : "") +
+            return '<div class="li"><span class="rank">' + (i + 1) + '</span><span class="mono sm">' + art(ART.icon(r.icon)) + esc(initials(r.name)) + '</span><div class="main"><div class="t1">' + esc(r.name) + (r.tag === ME ? '<span class="you">YOU</span>' : "") +
               (r.role && r.role !== "member" ? '<span class="role ' + esc(r.role) + '">' + esc(roleName[r.role] || r.role) + "</span>" : "") + "</div>" +
               '<div class="t2 num">' + (String(r.tag).startsWith("~") ? "Tag pending" : "#" + esc(r.tag)) + (inactive ? " · no change " + RANGE_LABEL[S.r.members] : "") + "</div></div>" +
               '<div class="end"><div class="big">' + fmt(r.tr) + "</div>" +
@@ -1058,8 +1110,12 @@ section[data-tab] { display: grid; gap: 12px; }
       const form = sec.querySelector("#goalForm"), formCard = form && form.closest("section > *");
       let after = false;
       for (const k of kids) { if (after) right.add(k); if (k === formCard) after = true; }
+    } else if (tab === "club") {
+      // Summary and chart on the left; member board and roster changes on the right.
+      const board = kids.findIndex((k) => k.querySelector('[data-seg="memSort"]'));
+      kids.forEach((k, i) => { if (board >= 0 && i >= board) right.add(k); });
     } else {
-      // Club: summary and chart beside the member board. Brawlers: summary beside the brawler list.
+      // Brawlers: summary beside the brawler list.
       right.add(kids[kids.length - 1]);
     }
     if (!right.size) return;
@@ -1073,6 +1129,34 @@ section[data-tab] { display: grid; gap: 12px; }
     if (sticky && a.offsetHeight + hdr + 40 < window.innerHeight) a.classList.add("stick");
   }
 
+  // ---------- motion ----------
+  const REDUCED = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function enterItems(sec) {
+    const cols = sec.querySelectorAll(":scope > .cols > .col");
+    const groups = cols.length ? [...cols].map((c) => [...c.children]) : [[...sec.children]];
+    for (const items of groups) items.forEach((el, i) => { el.classList.add("enter-item"); el.style.animationDelay = Math.min(i, 8) * 45 + "ms"; });
+  }
+  // Big numbers count up to their new value (with a short glow) when fresh data changes them.
+  const counts = {}, running = {};
+  function countUps(root) {
+    for (const el of root.querySelectorAll("[data-k]")) {
+      const k = el.dataset.k, v = +el.dataset.v, prev = counts[k];
+      counts[k] = v;
+      if (prev != null && prev !== v && !REDUCED()) running[k] = { from: prev, to: v, t0: performance.now() };
+      if (running[k]) { el.classList.add("bump"); el.textContent = fmt(running[k].from); }
+    }
+    if (Object.keys(running).length && !countUps.raf) countUps.raf = requestAnimationFrame(stepCounts);
+  }
+  function stepCounts(now) {
+    countUps.raf = 0;
+    for (const [k, a] of Object.entries(running)) {
+      const p = Math.min(1, (now - a.t0) / 900), val = Math.round(a.from + (a.to - a.from) * (1 - Math.pow(1 - p, 3)));
+      for (const el of document.querySelectorAll('[data-k="' + k + '"]')) el.textContent = fmt(val);
+      if (p >= 1) delete running[k];
+    }
+    if (Object.keys(running).length) countUps.raf = requestAnimationFrame(stepCounts);
+  }
+
   // ---------- render ----------
   const RENDER = { me: renderMe, club: renderClub, brawlers: renderBrawlers, goals: renderGoals };
   function render() {
@@ -1081,6 +1165,8 @@ section[data-tab] { display: grid; gap: 12px; }
     $("#skel").hidden = true;
     const P = D.P, C = D.C;
     if (P) $("#hName").textContent = P.p.name || "bboscox";
+    const av = $("#hAvatar"), iconId = P && P.p.icon;
+    if (av && iconId && av.dataset.icon !== String(iconId)) { av.innerHTML = art(ART.icon(iconId)) + esc(initials(P.p.name || "B")); av.dataset.icon = iconId; av.hidden = false; }
     $("#hSub").textContent = "Player // #" + ME;
     const btn = $("#refreshBtn");
     btn.classList.toggle("busy", S.live.busy);
@@ -1097,7 +1183,16 @@ section[data-tab] { display: grid; gap: 12px; }
     charts.length = 0;
     sec.innerHTML = RENDER[S.tab]();
     layoutColumns(sec, S.tab);
+    // Motion: panels rise in when you switch tabs; charts draw in when the tab, range or chart type changes.
+    const still = REDUCED();
+    const sig = [S.tab, S.r.me, S.r.club, S.chartMode].join("|");
+    S.drawAnim = !still && sig !== render.sig;
+    render.sig = sig;
+    if (!still && S.tab !== render.tab) enterItems(sec);
+    render.tab = S.tab;
     flushCharts();
+    S.drawAnim = false;
+    countUps(sec);
     for (const b of document.querySelectorAll(".tabbar button")) { if (b.dataset.go === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
     if (active === "brSearch") { const el = $("#brSearch"); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) {} } }
   }

@@ -981,7 +981,7 @@ section[data-tab] { display: grid; gap: 12px; }
           '<div class="field full" id="gBrWrap"' + (S.goalKind === "brawler" ? "" : " hidden") + '><label for="gBrawler">Brawler</label><select class="input" id="gBrawler">' +
             brOpts.map(([k, n]) => '<option value="' + esc(k) + '">' + esc(n) + " · " + fmt(P.b[k][0]) + "</option>").join("") +
           "</select></div>" +
-          '<div class="full row"><button class="btn" type="submit"' + (!locked && !S.goalBusy ? "" : " disabled") + '>Add goal</button><span class="sub" id="gMsg"></span></div>' +
+          '<div class="full row"><button class="btn" type="submit"' + (!locked && !S.goalBusy ? "" : " disabled") + '>Add goal</button><span class="sub" id="gMsg">' + (S.goalBusy ? "Saving…" : "") + '</span></div>' +
         "</form>" +
         (sugg.length && !locked ? '<div class="quick mt">' + sugg.map((s) => '<button class="btn ghost" data-quick="' + s.kind + ":" + s.target + '">+ ' + esc(goalTitle(s)) + "</button>").join("") + "</div>" : "") +
       "</div>";
@@ -1106,14 +1106,21 @@ section[data-tab] { display: grid; gap: 12px; }
     if (g.kind === "brawler") g.brawler = $("#gBrawler").value;
     addGoal(g);
   });
+  async function reloadGoals() {
+    S.goals = (await rest("goals?select=*&order=created_at.asc")).map(mapGoal);
+    cacheSet();
+  }
   async function goalCall(body) {
     if (!S.ownerCode || S.goalBusy) return;
-    S.goalBusy = true; render();
+    S.goalBusy = true;
+    if (body.action === "goal_delete") S.goals = S.goals.filter((g) => g.id !== body.id);
+    render();
     try {
       await callFn(Object.assign({ code: S.ownerCode }, body));
-      await loadData(false);
+      await reloadGoals();
       showBanner("");
     } catch (e) {
+      try { await reloadGoals(); } catch (e2) {}
       if (e.code === "wrong_code") {
         S.ownerCode = null;
         try { localStorage.removeItem("ownerCode"); } catch (x) {}
@@ -1173,6 +1180,8 @@ section[data-tab] { display: grid; gap: 12px; }
     setInterval(() => { if (due()) refreshLive(); }, 60e3);
     document.addEventListener("visibilitychange", () => { if (due()) refreshLive(); });
     setInterval(() => { if (document.visibilityState === "visible") render(); }, 60e3);
+    // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
+    if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   boot();
 })();

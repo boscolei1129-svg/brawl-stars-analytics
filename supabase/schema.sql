@@ -60,16 +60,8 @@ create policy "Anyone can read goals" on public.goals for select to anon, authen
 create extension if not exists pg_net with schema extensions;
 create extension if not exists pg_cron with schema pg_catalog;
 
--- Save a reading every 15 minutes, even when nobody has the app open.
-select cron.schedule(
-  'brawl-refresh',
-  '7,22,37,52 * * * *',
-  $$ select net.http_post(
-       url := 'https://iuukdskmzjglpvtlwldw.supabase.co/functions/v1/brawl',
-       body := '{"action":"refresh","src":"auto"}'::jsonb,
-       headers := '{"Content-Type":"application/json"}'::jsonb,
-       timeout_milliseconds := 60000) $$
-);
+-- Save a reading for every profile every 15 minutes, even when nobody has the app open.
+-- (Replaced by the per-profile schedule in "Multiple players" below.)
 
 -- Devices that turned on notifications. Private: only the server function reads or writes it.
 create table public.push_subs (
@@ -116,3 +108,66 @@ create policy "Anyone can read sessions" on public.sessions for select to anon, 
 -- Each member's most recent session (what the server extends when new battles arrive).
 create or replace view public.latest_sessions with (security_invoker = true) as
   select distinct on (tag) * from public.sessions order by tag, ended_at desc;
+
+-- ---------- Multiple players ----------
+-- Profiles: every tracked player (and the club it follows). Readable by anyone, like the stats.
+create table public.profiles (
+  tag text primary key,
+  club text,
+  name text,
+  icon bigint,
+  trophies integer,
+  club_name text,
+  club_badge bigint,                       -- the club's badge picture id
+  follow boolean not null default true,    -- follow whatever club the player is in
+  created_at timestamptz not null default now(),
+  last_open_at timestamptz not null default now(),
+  last_refresh_at timestamptz,
+  active boolean not null default true,    -- false = paused (nobody opened it for 30 days)
+  keep boolean not null default false      -- never pause
+);
+alter table public.profiles enable row level security;
+create policy "Anyone can read profiles" on public.profiles for select to anon, authenticated using (true);
+
+-- Each profile's code (guards its goals and alerts). Private: only the server function reads it.
+create table public.profile_codes (
+  tag text primary key references public.profiles(tag) on delete cascade,
+  code_sha256 text not null
+);
+alter table public.profile_codes enable row level security;
+
+-- Every row says which profile it belongs to (the first profile, #8YRJ090Q2, owned all rows before this).
+alter table public.readings add column tag text not null;
+create index readings_tag_ts_idx on public.readings (tag, ts);
+create index readings_tag_id_idx on public.readings (tag, id);
+alter table public.battles add column tag text not null;
+alter table public.battles drop constraint battles_pkey;
+alter table public.battles add primary key (tag, t);          -- two tracked players can be in the same battle
+alter table public.goals add column tag text not null;
+create index goals_tag_idx on public.goals (tag);
+alter table public.push_subs add column tag text not null;
+alter table public.push_subs drop constraint push_subs_pkey;
+alter table public.push_subs add primary key (endpoint, tag);  -- a phone can have alerts for several profiles
+-- Sessions belong to members; the club column says which club's activity they were read for.
+alter table public.sessions add column club text;
+create index sessions_club_end_idx on public.sessions (club, ended_at);
+create index sessions_club_upd_idx on public.sessions (club, updated_at);
+-- Server state in settings is kept per profile ('brawlers_full:TAG', 'club_full:TAG', 'notify_state:TAG')
+-- and activity timing per club ('activity_at:CLUBTAG').
+
+-- Each profile has its own minute in every 15, so they don't all hit the game's API at once.
+-- Profiles nobody has opened for 30 days pause (opening one wakes it up).
+select cron.schedule(
+  'brawl-refresh',
+  '* * * * *',
+  $$
+  update public.profiles set active = false where active and not keep and last_open_at < now() - interval '30 days';
+  select net.http_post(
+    url := 'https://iuukdskmzjglpvtlwldw.supabase.co/functions/v1/brawl',
+    body := jsonb_build_object('action', 'refresh', 'src', 'auto', 'tag', tag),
+    headers := '{"Content-Type":"application/json"}'::jsonb,
+    timeout_milliseconds := 60000)
+  from public.profiles
+  where active and mod(hashtext(tag)::bigint + 2147483648, 15) = mod(extract(minute from now())::int, 15);
+  $$
+);

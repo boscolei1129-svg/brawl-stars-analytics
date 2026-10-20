@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Brawl Stars Analytics</title>
-<meta name="description" content="Trophies, battles, brawlers and club stats for bboscox and Stargazers.">
+<meta name="description" content="Trophies, battles, brawlers and club stats for any Brawl Stars player, saved every 15 minutes.">
 <meta name="theme-color" content="#0c0e11">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -405,6 +405,130 @@ section[data-tab] { display: grid; gap: 12px; }
 .timepick:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(39, 211, 195, 0.16); }
 .timepick:disabled { opacity: 0.5; }
 
+/* Header: the player's name opens the home screen */
+.whobtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; margin: 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.whobtn .who .h1 { display: block; margin: 0; font-weight: 700; font-size: 23px; letter-spacing: 1px; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whobtn .who { flex: 0 1 auto; }
+.whobtn .swap { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: square; margin: 14px 0 0 -4px; transition: stroke 0.15s ease; }
+.whobtn:hover .swap { stroke: var(--fg); }
+.whobtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+/* Home: players saved on this phone, and adding one */
+html.homeopen, html.homeopen body { overflow: hidden; }
+.home { position: fixed; inset: 0; z-index: 100; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; animation: homein 0.24s ease-out both; }
+.home.leaving { opacity: 0; transition: opacity 0.16s ease-in; }
+@keyframes homein { from { opacity: 0; } }
+.home-sky { position: fixed; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(1.2px 1.2px at 8% 14%, rgba(232, 235, 240, 0.7), transparent 70%),
+    radial-gradient(1px 1px at 23% 31%, rgba(232, 235, 240, 0.45), transparent 70%),
+    radial-gradient(1.4px 1.4px at 41% 9%, rgba(232, 235, 240, 0.6), transparent 70%),
+    radial-gradient(1px 1px at 63% 22%, rgba(39, 211, 195, 0.7), transparent 70%),
+    radial-gradient(1.2px 1.2px at 82% 12%, rgba(232, 235, 240, 0.55), transparent 70%),
+    radial-gradient(1px 1px at 92% 36%, rgba(232, 235, 240, 0.4), transparent 70%),
+    radial-gradient(1px 1px at 15% 58%, rgba(232, 235, 240, 0.3), transparent 70%),
+    radial-gradient(1.2px 1.2px at 74% 52%, rgba(232, 235, 240, 0.35), transparent 70%),
+    radial-gradient(1px 1px at 52% 71%, rgba(39, 211, 195, 0.45), transparent 70%),
+    radial-gradient(1px 1px at 88% 84%, rgba(232, 235, 240, 0.3), transparent 70%),
+    radial-gradient(1px 1px at 33% 88%, rgba(232, 235, 240, 0.25), transparent 70%),
+    radial-gradient(640px 360px at 50% -120px, rgba(39, 211, 195, 0.16), transparent 72%),
+    radial-gradient(420px 260px at 100% 0, rgba(255, 122, 26, 0.07), transparent 70%);
+}
+.home-in { position: relative; max-width: 520px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 26px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 32px) max(20px, env(safe-area-inset-left, 0px)); }
+.home-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.emblem { position: relative; width: 78px; height: 78px; flex: none; }
+.emblem img { position: absolute; left: 13px; top: 13px; width: 52px; height: 52px; border-radius: 13px; box-shadow: 0 0 0 1px rgba(39, 211, 195, 0.35), 0 12px 40px rgba(39, 211, 195, 0.28); }
+.emblem svg { position: absolute; inset: 0; width: 78px; height: 78px; overflow: visible; animation: orbit 28s linear infinite; }
+.emblem .ring { fill: none; stroke: rgba(39, 211, 195, 0.45); stroke-width: 1; stroke-dasharray: 1.5 5.5; }
+.emblem .moon { fill: var(--teal); filter: drop-shadow(0 0 4px rgba(39, 211, 195, 0.9)); }
+@keyframes orbit { to { transform: rotate(360deg); } }
+.home-x { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--line); background: rgba(20, 23, 28, 0.75); padding: 0; cursor: pointer; }
+.home-x svg { width: 14px; height: 14px; stroke: var(--fg-2); stroke-width: 1.8; }
+.home-h { font-size: 31px; line-height: 1.08; font-weight: 700; letter-spacing: 0.3px; margin: 22px 0 8px; outline: none; }
+.home-lede { color: var(--fg-2); font-size: 15.5px; line-height: 1.5; margin: 0; max-width: 36ch; }
+.home-note { margin: 16px 0 0; padding: 10px 12px; border: 1px solid rgba(255, 122, 26, 0.45); background: var(--accent-soft); color: var(--fg); font-size: 14px; }
+.home-sec { margin-top: 30px; }
+.home-sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.home-sec-h h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.prow { display: flex; align-items: stretch; gap: 8px; margin-bottom: 8px; }
+.pbtn { flex: 1; min-width: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
+.pbtn:active { background: var(--raise); }
+.pbtn:disabled { cursor: default; opacity: 0.75; }
+.pbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.prow.cur .pbtn { border-color: rgba(39, 211, 195, 0.5); box-shadow: inset 3px 0 0 var(--teal); }
+.pbtn .mono.av { width: 48px; height: 48px; }
+.pmain { min-width: 0; display: grid; gap: 2px; }
+.pname { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; min-width: 0; font-size: 17px; }
+.pname b { min-width: 0; max-width: 100%; padding-right: 1px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcur { flex: none; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--teal); border: 1px solid rgba(39, 211, 195, 0.45); padding: 1px 6px; }
+.psub { font-family: var(--font-num); font-size: 12px; color: var(--muted); }
+.pclub { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-2); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pclub .badge { width: 16px; height: 16px; object-fit: contain; flex: none; }
+.ptro { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-num); font-weight: 700; font-size: 15px; }
+.tro { width: 14px; height: 14px; fill: var(--accent); flex: none; }
+.premove { flex: none; border: 1px solid rgba(255, 107, 107, 0.45); background: var(--bad-soft); color: var(--bad); font: inherit; font-weight: 600; font-size: 13px; padding: 0 14px; cursor: pointer; }
+.addcard { background: var(--surface); border: 1px solid var(--line); padding: 18px 16px 16px; }
+.tagfield { display: flex; align-items: center; gap: 4px; border-bottom: 2px solid var(--line); padding: 2px 0 8px; transition: border-color 0.2s ease; cursor: text; }
+.tagfield:focus-within { border-color: var(--accent); }
+.tagfield.found { border-color: var(--teal); }
+.tagfield.bad { border-color: var(--bad); }
+.tagfield .hash { font-family: var(--font-num); font-weight: 700; font-size: 30px; line-height: 1; color: var(--accent); }
+.tagfield input { flex: 1; min-width: 0; width: 100%; background: none; border: 0; outline: none; padding: 0; color: var(--fg); font-family: var(--font-num); font-weight: 700; font-size: 30px; line-height: 1.15; letter-spacing: 3px; text-transform: uppercase; }
+.tagfield input::placeholder { color: #353c47; }
+.tagfield.sm { margin-top: 10px; }
+.tagfield.sm .hash, .tagfield.sm input { font-size: 20px; letter-spacing: 2px; }
+.hint { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 8px; }
+.pv-wait { display: flex; align-items: center; gap: 10px; margin-top: 16px; color: var(--fg-2); font-size: 14px; }
+.pv-wait i { width: 14px; height: 14px; flex: none; border: 2px solid var(--line); border-top-color: var(--teal); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.pv-wait.big { align-items: flex-start; }
+.pv-wait.big i { margin-top: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pv-bar { height: 3px; margin-top: 12px; background: var(--line-2); overflow: hidden; }
+.pv-bar i { display: block; height: 100%; width: 35%; background: linear-gradient(90deg, transparent, var(--teal), transparent); animation: sweep 1.3s ease-in-out infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.pv-err { margin-top: 12px; color: var(--bad); font-size: 14px; line-height: 1.45; }
+.pcard { margin-top: 18px; padding: 14px; border: 1px solid rgba(39, 211, 195, 0.35);
+  background: linear-gradient(180deg, rgba(39, 211, 195, 0.09), rgba(39, 211, 195, 0) 55%), var(--raise); animation: deal 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes deal { from { opacity: 0; transform: translateY(-8px); } }
+.pc-top { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
+.pc-top .mono.av { width: 56px; height: 56px; }
+.pc-id { min-width: 0; display: grid; gap: 2px; }
+.pc-name { font-weight: 700; font-size: 21px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-tag { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); }
+.pc-tro { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-num); font-weight: 700; font-size: 17px; }
+.pc-tro .tro { width: 16px; height: 16px; }
+.pc-note { margin-top: 14px; color: var(--fg-2); font-size: 14px; line-height: 1.45; }
+.pc-sec { margin-top: 18px; }
+.pc-lbl { display: block; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.clubopts { display: grid; gap: 6px; }
+.clubopt { display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 9px 10px; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); color: inherit; font: inherit; }
+.clubopt[aria-checked="true"] { border-color: var(--teal); box-shadow: inset 0 0 0 1px var(--teal); background: rgba(39, 211, 195, 0.06); }
+.clubopt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.clubopt b { display: block; font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clubopt small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+.cicon { position: relative; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--raise); }
+.cicon .badge { position: absolute; inset: 3px; width: 26px; height: 26px; object-fit: contain; }
+.cicon .cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
+.cicon svg { width: 14px; height: 14px; fill: none; stroke: var(--fg-2); stroke-width: 1.8; }
+.clubfound { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.clubfound .badge { width: 34px; height: 34px; object-fit: contain; }
+.clubfound b { display: block; font-weight: 600; }
+.clubfound small { color: var(--muted); font-size: 12px; font-family: var(--font-num); }
+.code-in { font-family: var(--font-num); font-weight: 700; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; }
+.btn.wide { width: 100%; margin-top: 18px; padding: 14px; font-size: 14px; }
+.feats { display: grid; gap: 14px; margin-top: 34px; }
+.feat { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 14px; align-items: center; }
+.fi { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid rgba(39, 211, 195, 0.35); background: rgba(39, 211, 195, 0.06); }
+.fi svg { width: 18px; height: 18px; fill: none; stroke: var(--teal); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.feat b { display: block; font-weight: 600; font-size: 15px; }
+.feat small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; margin-top: 2px; }
+.home-foot { margin: 36px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .home, .pcard { animation: none; } .emblem svg, .pv-wait i, .pv-bar i { animation: none; } }
+
 /* Motion */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes glow { 0% { text-shadow: 0 0 0 transparent; } 25% { text-shadow: 0 0 22px currentColor; } 100% { text-shadow: 0 0 0 transparent; } }
@@ -433,14 +557,19 @@ button:active { transform: scale(0.97); }
 </head>
 <body>
 
+<div id="home" class="home" hidden></div>
+
 <div class="wrap">
   <header class="top">
     <div class="top-row">
-      <span class="mono av" id="hAvatar" hidden></span>
-      <div class="who">
-        <span class="k-label" id="hSub">Player // #8YRJ090Q2</span>
-        <h1 id="hName">bboscox</h1>
-      </div>
+      <button class="whobtn" id="whoBtn" aria-label="Switch profile">
+        <span class="mono av" id="hAvatar" hidden></span>
+        <span class="who">
+          <span class="k-label" id="hSub">Player</span>
+          <span class="h1" id="hName" role="heading" aria-level="1"></span>
+        </span>
+        <svg class="swap" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+      </button>
       <button class="sync stale" id="refreshBtn" aria-label="Refresh stats now" title="Refresh stats now"><i></i><span id="syncTxt">Loading</span></button>
     </div>
     <div class="rangebar" id="rangeBar" role="group" aria-label="Time range for every stat on this tab" hidden></div>
@@ -469,7 +598,11 @@ button:active { transform: scale(0.97); }
 <script>
 (() => {
   "use strict";
-  const ME = "8YRJ090Q2", CLUB = "2U0RP22G2";
+  const LEGACY = "8YRJ090Q2"; // the first profile, from before the app had a home screen
+  // Player and club tags only use these characters. People often type O for 0.
+  const TAG_RE = /^[0289PYLQGRJCUV]{3,14}$/;
+  const normTag = (t) => String(t || "").toUpperCase().replace(/[\s#]/g, "").replace(/O/g, "0");
+  let ME = null; // the open profile's player tag
   // Supabase project: the publishable key only allows reading; all writes go through the server function.
   const SB_URL = "https://iuukdskmzjglpvtlwldw.supabase.co";
   const SB_KEY = "sb_publishable_Gxii5jw3MdCFv9CbTsVCKA_g0sIFaWh";
@@ -479,7 +612,7 @@ button:active { transform: scale(0.97); }
   const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
 
   const S = {
-    readings: [], battleRows: [], goals: [], sessions: [], actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
+    readings: [], battleRows: [], goals: [], sessions: [], sessClub: null, profile: null, actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
     tab: "me", live: { busy: false, err: null, at: 0 },
     r: { me: "24h", climb: "7d", club: "7d", members: "7d" },
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
@@ -586,7 +719,7 @@ button:active { transform: scale(0.97); }
     return out;
   }
   async function callFn(body) {
-    const r = await fetch(FN_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify(body) });
+    const r = await fetch(FN_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify(Object.assign({ tag: ME }, body)) });
     let j = null;
     try { j = await r.json(); } catch (e) {}
     if (!r.ok || !j || j.ok === false && body.action !== "check_code") {
@@ -615,23 +748,39 @@ button:active { transform: scale(0.97); }
       };
     });
   }
-  const cacheGet = () => Promise.race([idb("readonly", (st) => st.get("data")).catch(() => null), new Promise((r) => setTimeout(() => r(null), 1500))]);
-  const cacheSet = () => idb("readwrite", (st) => st.put({ v: CACHE_V, at: Date.now(), readings: S.readings, battleRows: S.battleRows, goals: S.goals, sessions: S.sessions }, "data")).catch(() => {});
+  const cacheGet = () => Promise.race([
+    idb("readonly", (st) => st.get("data:" + ME)).then((v) => v || (ME === LEGACY ? idb("readonly", (st) => st.get("data")) : null)).catch(() => null),
+    new Promise((r) => setTimeout(() => r(null), 1500))]);
+  const cacheSet = () => idb("readwrite", (st) => st.put({ v: CACHE_V, at: Date.now(), readings: S.readings, battleRows: S.battleRows, goals: S.goals, sessions: S.sessions, sessClub: S.sessClub, profile: S.profile }, "data:" + ME)).catch(() => {});
   // Members' play sessions: the last 15 days on first load, then only the ones that changed since.
   const SESSION_DAYS = 15;
   async function loadSessions(full) {
+    const club = S.profile && S.profile.club;
+    if (!club) { S.sessClub = null; return []; }
+    if (S.sessClub !== club) full = true; // the player moved club
+    S.sessClub = club;
     const cutoff = Date.now() - SESSION_DAYS * DAY;
     const keep = (rows) => rows.filter((r) => msOf(r.ended_at) >= cutoff);
-    if (full || !S.sessions.length) return keep(await restAll("sessions", "*", "ended_at=gte." + encodeURIComponent(new Date(cutoff).toISOString())));
+    if (full || !S.sessions.length) return keep(await restAll("sessions", "*", "club=eq." + club + "&ended_at=gte." + encodeURIComponent(new Date(cutoff).toISOString())));
     const since = S.sessions.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), "");
-    const fresh = await restAll("sessions", "*", "updated_at=gt." + encodeURIComponent(since));
+    const fresh = await restAll("sessions", "*", "club=eq." + club + "&updated_at=gt." + encodeURIComponent(since));
     const byId = new Map(S.sessions.map((r) => [r.id, r]));
     for (const r of fresh) byId.set(r.id, r);
     return keep([...byId.values()]);
   }
+  // The open profile's card: name, picture, club. A tag that isn't tracked sends you to the home screen.
+  async function loadProfile() {
+    const rows = await rest("profiles?select=*&tag=eq." + ME);
+    if (!rows.length) { const e = new Error("That player isn't tracked."); e.code = "unknown_profile"; throw e; }
+    S.profile = rows[0];
+    PROFILES.upsert(cardOf(S.profile));
+  }
   async function loadData(full) {
+    // The player's card says which club's activity to load. A saved copy is enough to start with, so it loads alongside the rest.
+    const prof = loadProfile().catch((e) => { if (e.code === "unknown_profile" || !S.profile) throw e; });
+    if (!S.profile) await prof;
     if (full || !S.readings.length) {
-      const [rd, bt, gl, ss] = await Promise.all([restAll("readings", READ_COLS), restAll("battles", "*"), rest("goals?select=*&order=created_at.asc"), loadSessions(true)]);
+      const [rd, bt, gl, ss] = await Promise.all([restAll("readings", READ_COLS, "tag=eq." + ME), restAll("battles", "*", "tag=eq." + ME), rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc"), loadSessions(true)]);
       S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal); S.sessions = ss;
     } else {
       const lastId = Math.max(...S.readings.map((r) => r.id));
@@ -640,9 +789,9 @@ button:active { transform: scale(0.97); }
       const since = new Date(Math.max(0, lastT - 6 * HOUR)).toISOString();
       // The newest reading is fetched again: when nothing changed, the server only moves its "checked" time.
       const [rd, bt, gl, ss] = await Promise.all([
-        restAll("readings", READ_COLS, "id=gte." + lastId),
-        restAll("battles", "*", "t=gt." + encodeURIComponent(since)),
-        rest("goals?select=*&order=created_at.asc"),
+        restAll("readings", READ_COLS, "tag=eq." + ME + "&id=gte." + lastId),
+        restAll("battles", "*", "tag=eq." + ME + "&t=gt." + encodeURIComponent(since)),
+        rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc"),
         loadSessions(false),
       ]);
       S.sessions = ss;
@@ -655,6 +804,7 @@ button:active { transform: scale(0.97); }
       S.battleRows = [...bm.values()];
       S.goals = gl.map(mapGoal);
     }
+    await prof;
     S.ver++;
     cacheSet();
   }
@@ -1073,7 +1223,7 @@ button:active { transform: scale(0.97); }
 
   function renderClub() {
     const C = D.C;
-    if (!C) return emptyState("Club stats will appear after the first update.");
+    if (!C) return emptyState(S.profile && !S.profile.club ? "This player isn't in a club, so there's no club to show. If they join one, it appears here." : "Club stats will appear after the first update.");
     const c = Object.assign({ members: [] }, C.c);
     const c24 = change(D.cSeries, DAY), cr = change(D.cSeries, RANGES[S.r.club]);
     const base = snapAt(D.cs, Date.now() - RANGES[S.r.members]);
@@ -1162,8 +1312,8 @@ button:active { transform: scale(0.97); }
     const sugg = suggestions.filter((s) => !S.goals.some((g) => g.kind === s.kind && g.target === s.target));
     const locked = !S.ownerCode;
     const lock = locked
-      ? '<div class="card"><h2>Unlock goal editing</h2><form id="codeForm" class="row" novalidate><input class="input" id="ownerCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Owner code" aria-label="Owner code" style="flex:1;min-width:140px"><button class="btn" type="submit">Unlock</button></form>' +
-        '<div class="sub mt" id="codeMsg">Anyone with the link can see goals. Enter your owner code once on this device to add or remove them.</div></div>'
+      ? '<div class="card"><h2>Unlock goal editing</h2><form id="codeForm" class="row" novalidate><input class="input" id="ownerCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code" aria-label="Player code" style="flex:1;min-width:140px"><button class="btn" type="submit">Unlock</button></form>' +
+        '<div class="sub mt" id="codeMsg">Anyone can see these goals. To add or remove them, enter the code chosen when this player was added. This phone remembers it.</div></div>'
       : "";
     const form =
       '<div class="card cut"><h2>New goal<span class="sp"></span>' + (locked ? "" : '<button class="link" data-act="lock">Lock</button>') + "</h2>" +
@@ -1350,7 +1500,7 @@ button:active { transform: scale(0.97); }
   }
   const modeTop = (modes) => { const e = Object.entries(modes || {}).sort((a, b) => b[1] - a[1])[0]; return e ? modeName(e[0]) : ""; };
   function renderActivity() {
-    if (!D.C) return emptyState("Club activity appears after the first update.");
+    if (!D.C) return emptyState(S.profile && !S.profile.club ? "This player isn't in a club, so there's no club activity to show." : "Club activity appears after the first update.");
     const A = activity(), now = Date.now();
     if (!S.sessions.length)
       return '<div class="card cut"><h2>Club activity</h2><div class="chart-empty" style="min-height:120px">Collecting activity. The server reads every member\'s battle log every 15 minutes, so the first sessions show up shortly.</div></div>';
@@ -1361,7 +1511,7 @@ button:active { transform: scale(0.97); }
     // Now
     const nowCard =
       '<div class="card cut act-now" id="act-now">' +
-        '<div class="hud-k k-label"><span>Online now</span><span>Stargazers</span></div>' +
+        '<div class="hud-k k-label"><span>Online now</span><span>' + esc(D.C.c.name || "Club") + "</span></div>" +
         '<div class="big-row"><span class="pulse' + (A.online.length ? "" : " off") + '"></span><span class="hero-num teal" data-k="online" data-v="' + A.online.length + '" style="margin:6px 0">' + A.online.length + '</span><span class="of">/ ' + A.members.length + " playing</span></div>" +
         (A.online.length
           ? '<div class="who-on">' + A.online.map((m) => '<span class="p">' + avatar(m) + esc(m.name) + '<span class="ago">' + esc(agoShort(A.lastEnd(m.tag))) + "</span></span>").join("") + "</div>"
@@ -1441,7 +1591,7 @@ button:active { transform: scale(0.97); }
   const PUSH_KINDS = [
     ["goals", "Goals reached", "When you hit a target you set above."],
     ["milestones", "Trophy milestones", "Every 500 trophies for you and every 5,000 for the club."],
-    ["roster", "Members joining or leaving", "When someone joins or leaves Stargazers, with the new member count."],
+    ["roster", "Members joining or leaving", "When someone joins or leaves the club, with the new member count."],
     ["recap", "Daily recap", "Your last 24 hours: battles, trophies and win rate. Plus the trophies other members won for the club, not counting you or new members joining."],
   ];
   const myZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } };
@@ -1484,10 +1634,15 @@ button:active { transform: scale(0.97); }
     P.supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     P.ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     P.standalone = !!((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true);
-    try { Object.assign(P.prefs, JSON.parse(localStorage.getItem("pushPrefs") || "{}")); } catch (e) {}
+    try { Object.assign(P.prefs, JSON.parse(lsGet("pushPrefs:" + ME) || "{}")); } catch (e) {}
     if (!P.supported) return;
     P.permission = Notification.permission;
-    try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); P.endpoint = sub ? sub.endpoint : null; } catch (e) {}
+    try {
+      const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      // Alerts turned on before profiles existed were for the first profile.
+      if (lsGet("pushLegacy")) { if (sub && ME === LEGACY) lsSet("pushOn:" + LEGACY, "1"); lsSet("pushLegacy", null); }
+      P.endpoint = sub && lsGet("pushOn:" + ME) ? sub.endpoint : null;
+    } catch (e) {}
     render();
   }
   async function pushOn() {
@@ -1504,9 +1659,10 @@ button:active { transform: scale(0.97); }
       const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlBytes(key) }));
       await callFn({ action: "push_subscribe", code: S.ownerCode, sub: sub.toJSON(), prefs: pushPrefsOut() });
       P.endpoint = sub.endpoint;
-      P.msg = "Notifications are on for this device. Send a test to check.";
+      lsSet("pushOn:" + ME, "1");
+      P.msg = "Notifications are on for this player on this phone. Send a test to check.";
     } catch (e) {
-      P.msg = e && e.code === "wrong_code" ? "That owner code no longer works. Unlock again first." : "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
+      P.msg = e && e.code === "wrong_code" ? "That code no longer works. Unlock goal editing again first." : "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
     } finally { P.busy = false; render(); }
   }
   async function pushOff() {
@@ -1516,8 +1672,13 @@ button:active { transform: scale(0.97); }
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (sub) { await callFn({ action: "push_unsubscribe", endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
-      P.endpoint = null; P.msg = "Notifications are off for this device.";
+      if (sub) {
+        await callFn({ action: "push_unsubscribe", endpoint: sub.endpoint }).catch(() => {});
+        lsSet("pushOn:" + ME, null);
+        // Other players on this phone may still use the same subscription.
+        if (!PROFILES.list().some((p) => p.tag !== ME && lsGet("pushOn:" + p.tag))) await sub.unsubscribe();
+      }
+      P.endpoint = null; P.msg = "Notifications are off for this player on this phone.";
     } catch (e) { P.msg = "Couldn't turn notifications off: " + String((e && e.message) || e).slice(0, 120); }
     finally { P.busy = false; render(); }
   }
@@ -1532,7 +1693,7 @@ button:active { transform: scale(0.97); }
   async function pushPref(k) {
     const P = S.push;
     P.prefs[k] = P.prefs[k] === false;
-    try { localStorage.setItem("pushPrefs", JSON.stringify(P.prefs)); } catch (e) {}
+    lsSet("pushPrefs:" + ME, JSON.stringify(P.prefs));
     render();
     if (P.endpoint && S.ownerCode) {
       try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); }
@@ -1543,7 +1704,7 @@ button:active { transform: scale(0.97); }
     const P = S.push, before = recapAt();
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v) || v === before) { render(); return; }
     P.prefs.recap_at = v; P.msg = "";
-    try { localStorage.setItem("pushPrefs", JSON.stringify(P.prefs)); } catch (e) {}
+    lsSet("pushPrefs:" + ME, JSON.stringify(P.prefs));
     render();
     if (P.endpoint && S.ownerCode) {
       try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: pushPrefsOut() }); P.msg = "Daily recap set for " + clock(v) + "."; }
@@ -1559,7 +1720,7 @@ button:active { transform: scale(0.97); }
     derive();
     $("#skel").hidden = true;
     const P = D.P, C = D.C;
-    if (P) $("#hName").textContent = P.p.name || "bboscox";
+    $("#hName").textContent = (P && P.p.name) || (S.profile && S.profile.name) || "#" + ME;
     const av = $("#hAvatar"), iconId = P && P.p.icon;
     if (av && iconId && av.dataset.icon !== String(iconId)) { av.innerHTML = art(ART.icon(iconId)) + esc(initials(P.p.name || "B")); av.dataset.icon = iconId; av.hidden = false; }
     $("#hSub").textContent = "Player // #" + ME;
@@ -1639,6 +1800,8 @@ button:active { transform: scale(0.97); }
     if (t.dataset.actM) { S.actOpen = S.actOpen === t.dataset.actM ? null : t.dataset.actM; render(); return; }
     if (t.dataset.br) { S.openBrawler = S.openBrawler === t.dataset.br ? null : t.dataset.br; render(); return; }
     if (t.id === "refreshBtn" || t.dataset.act === "retry" || t.dataset.act === "allow") { refreshLive(); return; }
+    if (t.id === "whoBtn") { showHome(); return; }
+    if (t.dataset.home || t.dataset.open || t.dataset.remove || t.dataset.club) { homeClick(t); return; }
     if (t.dataset.act === "maps") { S.showAllMaps = !S.showAllMaps; render(); return; }
     if (t.dataset.act === "log") { S.showAllLog = !S.showAllLog; render(); return; }
     if (t.dataset.quick) { const [kind, target] = t.dataset.quick.split(":"); addGoal({ kind, target: +target }); return; }
@@ -1647,10 +1810,13 @@ button:active { transform: scale(0.97); }
     if (t.dataset.del) { const id = t.dataset.del; S.confirmDel = null; goalCall({ action: "goal_delete", id }); return; }
     if (t.dataset.push) { if (t.dataset.push === "on") pushOn(); else if (t.dataset.push === "off") pushOff(); else pushTest(); return; }
     if (t.dataset.pref) { pushPref(t.dataset.pref); return; }
-    if (t.dataset.act === "lock") { S.ownerCode = null; try { localStorage.removeItem("ownerCode"); } catch (e) {} render(); return; }
+    if (t.dataset.act === "lock") { S.ownerCode = null; lsSet("code:" + ME, null); render(); return; }
   });
   document.addEventListener("input", (ev) => {
     if (ev.target.id === "brSearch") { S.brQuery = ev.target.value; render(); }
+    if (ev.target.id === "hTag") tagTyped(ev.target.value);
+    if (ev.target.id === "hClub") clubTyped(ev.target.value);
+    if (ev.target.id === "hCode") { H.code = ev.target.value; paintAction(); }
   });
   document.addEventListener("change", (ev) => {
     // Some phones report every turn of the time wheel, so the time is saved once it settles or the picker closes.
@@ -1673,7 +1839,7 @@ button:active { transform: scale(0.97); }
     addGoal(g);
   });
   async function reloadGoals() {
-    S.goals = (await rest("goals?select=*&order=created_at.asc")).map(mapGoal);
+    S.goals = (await rest("goals?select=*&tag=eq." + ME + "&order=created_at.asc")).map(mapGoal);
     cacheSet();
   }
   async function goalCall(body) {
@@ -1689,8 +1855,8 @@ button:active { transform: scale(0.97); }
       try { await reloadGoals(); } catch (e2) {}
       if (e.code === "wrong_code") {
         S.ownerCode = null;
-        try { localStorage.removeItem("ownerCode"); } catch (x) {}
-        showBanner("<b>That owner code no longer works.</b> Enter it again on the Goals tab.");
+        lsSet("code:" + ME, null);
+        showBanner("<b>That code no longer works.</b> Enter it again on the Goals tab.");
       } else {
         showBanner("<b>Couldn't save that change.</b> " + esc(String((e && e.message) || e).slice(0, 140)));
       }
@@ -1701,21 +1867,322 @@ button:active { transform: scale(0.97); }
   function addGoal(g) { return goalCall({ action: "goal_add", kind: g.kind, target: g.target, brawler: g.brawler }); }
   async function unlock(raw) {
     const msg = $("#codeMsg"), code = String(raw || "").trim();
-    if (!code) { if (msg) msg.textContent = "Enter your owner code."; return; }
+    if (!code) { if (msg) msg.textContent = "Enter this player's code."; return; }
     if (msg) msg.textContent = "Checking…";
     try {
       const r = await callFn({ action: "check_code", code });
       if (r.ok) {
         S.ownerCode = code;
-        try { localStorage.setItem("ownerCode", code); } catch (e) {}
+        lsSet("code:" + ME, code.toUpperCase());
         render();
       } else if (msg) msg.textContent = "That code isn't right. Check it and try again.";
     } catch (e) {
       if (msg) msg.textContent = "Couldn't check the code right now. Try again in a moment.";
     }
   }
+  document.addEventListener("keydown", (ev) => {
+    if (!H.open) return;
+    if (ev.key === "Escape" && canCloseHome()) { closeHome(); return; }
+    if (ev.key === "Enter" && (ev.target.id === "hCode" || ev.target.id === "hClub")) { ev.preventDefault(); addProfile(); }
+  });
   let rT = null;
   window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(render, 150); });
+
+  // ---------- profiles saved on this phone ----------
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+  const PROFILES = {
+    list() { try { const l = JSON.parse(lsGet("profiles") || "[]"); return Array.isArray(l) ? l.filter((p) => p && TAG_RE.test(p.tag)) : []; } catch (e) { return []; } },
+    save(l) { lsSet("profiles", JSON.stringify(l)); },
+    current() { return lsGet("current"); },
+    setCurrent(t) { lsSet("current", t || null); },
+    upsert(p) { const l = this.list(), i = l.findIndex((x) => x.tag === p.tag); if (i >= 0) l[i] = Object.assign(l[i], p); else l.push(Object.assign({ added: Date.now() }, p)); this.save(l); return l; },
+    remove(t) { this.save(this.list().filter((x) => x.tag !== t)); },
+  };
+  const cardOf = (p) => ({ tag: p.tag, name: p.name, icon: p.icon, trophies: p.trophies, club: p.club, clubName: p.club_name, clubBadge: p.club_badge });
+  // Which profile to open: a link or notification (?p=TAG), else the last one used. A phone that used the app
+  // before it had profiles was the first profile's, so it opens straight to it with its code and alerts.
+  async function pickProfile() {
+    let list = PROFILES.list(), cur = PROFILES.current();
+    if (!list.length && !cur) {
+      const used = lsGet("tab") || lsGet("prefs") || lsGet("ownerCode") || lsGet("pushPrefs") || (await idb("readonly", (st) => st.get("data")).catch(() => null));
+      if (used) {
+        list = PROFILES.upsert({ tag: LEGACY, name: "bboscox", club: "2U0RP22G2", clubName: "Stargazers" });
+        cur = LEGACY;
+        if (lsGet("ownerCode")) { lsSet("code:" + LEGACY, lsGet("ownerCode")); lsSet("ownerCode", null); }
+        if (lsGet("pushPrefs")) { lsSet("pushPrefs:" + LEGACY, lsGet("pushPrefs")); lsSet("pushPrefs", null); }
+        lsSet("pushLegacy", "1");
+      }
+    }
+    const q = new URLSearchParams(location.search).get("p");
+    if (q != null) {
+      const t = normTag(q);
+      if (TAG_RE.test(t)) { if (!list.some((p) => p.tag === t)) list = PROFILES.upsert({ tag: t }); cur = t; }
+      try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
+    }
+    if (cur && !list.some((p) => p.tag === cur)) cur = list.length ? list[0].tag : null;
+    PROFILES.setCurrent(cur);
+    return cur;
+  }
+
+  // ---------- home screen: saved profiles and adding a player ----------
+  ART.badge = (id) => (id ? "https://cdn.brawlify.com/club-badges/regular/" + id + ".png" : null);
+  const H = { open: false, edit: false, q: "", look: null, lookErr: "", lookBusy: false, clubMode: "own", clubQ: "", clubLook: null, clubErr: "", clubBusy: false, code: "", busy: false, err: "", note: "" };
+  const TROPHY = '<svg class="tro" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h8v1.6h2.6v1.6a3.6 3.6 0 0 1-3.2 3.6A4.2 4.2 0 0 1 8.9 10.7v1.6h2.3V14.5H4.8v-2.2h2.3v-1.6A4.2 4.2 0 0 1 4.6 8.3 3.6 3.6 0 0 1 1.4 4.7V3.1H4V1.5Zm0 3.2H3v.1a2 2 0 0 0 1.2 1.8A5 5 0 0 1 4 5.2v-.5Zm8 0v.5a5 5 0 0 1-.2 1.4A2 2 0 0 0 13 4.8v-.1h-1Z"/></svg>';
+  const CODE_RE = /^[A-Za-z0-9]{4,12}$/;
+  const canCloseHome = () => !!ME && PROFILES.list().some((p) => p.tag === ME);
+  function showHome(opts) {
+    opts = opts || {};
+    H.open = true; H.edit = false; H.err = ""; H.note = opts.note || "";
+    if (opts.prefill) { H.q = opts.prefill; }
+    const el = $("#home");
+    el.innerHTML = homeShell();
+    el.hidden = false; el.classList.remove("leaving");
+    document.documentElement.classList.add("homeopen");
+    paintSaved(); paintPreview();
+    if (opts.prefill) tagTyped(opts.prefill);
+    const focus = $("#home .home-h"); if (focus) focus.focus({ preventScroll: true });
+    freshenSaved();
+  }
+  function closeHome() {
+    H.open = false;
+    $("#home").hidden = true;
+    document.documentElement.classList.remove("homeopen");
+    const b = $("#whoBtn"); if (b) b.focus({ preventScroll: true });
+  }
+  function homeShell() {
+    const first = !PROFILES.list().length;
+    return '<div class="home-sky" aria-hidden="true"></div>' +
+      '<div class="home-in">' +
+        '<div class="home-top"><div class="emblem" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="46"/><circle class="moon" cx="50" cy="4" r="3"/></svg><img src="icon-192.png" alt=""></div>' +
+          (canCloseHome() ? '<button class="home-x" data-home="close" aria-label="Back to the open player"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>' : "") + "</div>" +
+        '<h1 class="home-h" tabindex="-1">' + (first ? "Track a Brawl Stars player" : "Players") + "</h1>" +
+        '<p class="home-lede">' + (first ? "Trophies, battles, brawlers and club stats, saved every 15 minutes. Enter a player tag to start." : "Open a player saved on this phone, or add another one.") + "</p>" +
+        (H.note ? '<p class="home-note" role="status">' + esc(H.note) + "</p>" : "") +
+        (first ? "" : '<section class="home-sec" aria-labelledby="hsT"><div class="home-sec-h"><h2 id="hsT">On this phone</h2><button class="link" data-home="edit" id="hEdit">' + (H.edit ? "Done" : "Edit") + '</button></div><div id="hSaved"></div></section>') +
+        '<section class="home-sec" aria-labelledby="haT"><div class="home-sec-h"><h2 id="haT">Add a player</h2></div>' +
+          '<div class="addcard">' +
+            '<label class="tagfield" id="hTagField" for="hTag"><span class="hash" aria-hidden="true">#</span>' +
+              '<input id="hTag" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="Player tag" aria-label="Player tag" aria-describedby="hTagHint" value="' + esc(H.q) + '"></label>' +
+            '<div class="hint" id="hTagHint">In Brawl Stars, tap your profile picture. Your tag is the code under your name.</div>' +
+            '<div id="hPreview" aria-live="polite"></div>' +
+          "</div>" +
+        "</section>" +
+        (first ? '<section class="home-sec feats" aria-label="What the app tracks">' +
+          feat('<path d="M2 12.5l3.5-4 3 2.5L14 4"/><path d="M10.5 4H14v3.5"/>', "Trophy history", "Saved every 15 minutes, even while the app is closed.") +
+          feat('<circle cx="5.5" cy="5.5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M1.8 13.5c.5-2.3 2-3.6 3.7-3.6s3.2 1.3 3.7 3.6M9.6 10.3c1.6-.4 3.6.4 4.4 3.2"/>', "Club board and activity", "Who's climbing, who's online, and when the club plays.") +
+          feat('<path d="M4 7a4 4 0 0 1 8 0v3l1.3 2H2.7L4 10V7Z"/><path d="M6.6 14h2.8"/>', "Goals and alerts", "Targets with finish dates, milestones and a daily recap.") +
+          "</section>" : "") +
+        '<p class="home-foot">Unofficial. Not affiliated with or endorsed by Supercell.</p>' +
+      "</div>";
+  }
+  const feat = (path, title, sub) => '<div class="feat"><span class="fi"><svg viewBox="0 0 16 16" aria-hidden="true">' + path + "</svg></span><span><b>" + title + "</b><small>" + sub + "</small></span></div>";
+  function paintSaved() {
+    const box = $("#hSaved");
+    if (!box) return;
+    const list = PROFILES.list().slice().sort((a, b) => (b.tag === ME) - (a.tag === ME) || (a.added || 0) - (b.added || 0));
+    box.innerHTML = list.map((p) => {
+      const cur = p.tag === ME;
+      return '<div class="prow' + (cur ? " cur" : "") + '">' +
+        '<button class="pbtn" data-open="' + esc(p.tag) + '"' + (H.edit ? " disabled" : "") + ">" +
+          '<span class="mono av">' + art(ART.icon(p.icon)) + esc(initials(p.name || p.tag)) + "</span>" +
+          '<span class="pmain"><span class="pname"><b>' + esc(p.name || "#" + p.tag) + "</b>" + (cur ? '<span class="pcur">Open now</span>' : "") + "</span>" +
+            '<span class="psub">#' + esc(p.tag) + "</span>" +
+            (p.clubName ? '<span class="pclub">' + art(ART.badge(p.clubBadge)).replace('class="art"', 'class="art badge"') + esc(p.clubName) + "</span>" : "") + "</span>" +
+          '<span class="ptro">' + TROPHY + fmt(p.trophies) + "</span>" +
+        "</button>" +
+        (H.edit ? '<button class="premove" data-remove="' + esc(p.tag) + '">Remove</button>' : "") +
+      "</div>";
+    }).join("") + (H.edit ? '<div class="hint">Removing a player only takes it off this phone. Its stats keep being saved for anyone else following it.</div>' : "");
+    const e = $("#hEdit"); if (e) e.textContent = H.edit ? "Done" : "Edit";
+  }
+  // Update the saved cards (trophies, names, clubs) from the server.
+  async function freshenSaved() {
+    const tags = PROFILES.list().map((p) => p.tag);
+    if (!tags.length) return;
+    try {
+      const rows = await rest("profiles?select=tag,name,icon,trophies,club,club_name,club_badge&tag=in.(" + tags.join(",") + ")");
+      for (const r of rows) PROFILES.upsert(cardOf(r));
+      if (H.open && !H.edit) paintSaved();
+    } catch (e) {}
+  }
+  const tagState = () => {
+    const f = $("#hTagField"); if (!f) return;
+    f.classList.toggle("found", !!H.look); f.classList.toggle("bad", !!H.lookErr);
+  };
+  function paintPreview() {
+    const box = $("#hPreview"); if (!box) return;
+    tagState();
+    if (H.lookBusy) { box.innerHTML = '<div class="pv-wait"><i></i>Looking up #' + esc(normTag(H.q)) + "</div>"; return; }
+    if (H.lookErr) { box.innerHTML = '<div class="pv-err">' + esc(H.lookErr) + "</div>"; return; }
+    const L = H.look;
+    if (!L) { box.innerHTML = ""; return; }
+    const pl = L.player, saved = PROFILES.list().some((p) => p.tag === pl.tag);
+    box.innerHTML = '<div class="pcard">' +
+      '<div class="pc-top"><span class="mono av">' + art(ART.icon(pl.icon)) + esc(initials(pl.name)) + "</span>" +
+        '<span class="pc-id"><span class="pc-name">' + esc(pl.name) + '</span><span class="pc-tag">#' + esc(pl.tag) + "</span></span>" +
+        '<span class="pc-tro">' + TROPHY + fmt(pl.trophies) + "</span></div>" +
+      (saved
+        ? '<div class="pc-note">' + esc(pl.name) + ' is already saved on this phone.</div><button class="btn wide" data-home="open-look">Open ' + esc(pl.name) + "</button>"
+        : L.tracked
+          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts need the code chosen when they were added.</div>" +
+            '<div id="pvAction"></div>'
+          : '<div class="pc-sec"><span class="pc-lbl" id="clubLbl">Club to follow</span><div id="pvClub"></div></div>' +
+            '<div class="pc-sec"><label class="pc-lbl" for="hCode">Code for goals and alerts</label>' +
+              '<input class="input code-in" id="hCode" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="12" aria-describedby="hCodeHint" value="' + esc(H.code) + '">' +
+              '<div class="hint" id="hCodeHint">4 to 12 letters or numbers. You\'ll need it to set goals or turn on alerts for this player, on any phone. It can\'t be reset, so keep it somewhere safe.</div></div>' +
+            '<div id="pvAction"></div>') +
+      "</div>";
+    if (!saved) { paintClub(); paintAction(); }
+  }
+  function paintClub() {
+    const box = $("#pvClub"), L = H.look; if (!box || !L) return;
+    const own = L.player.club, c = L.club && L.club.own ? L.club : null;
+    const opt = (mode, icon, title, sub) => '<button class="clubopt" role="radio" data-club="' + mode + '" aria-checked="' + (H.clubMode === mode) + '"' + (H.busy ? " disabled" : "") + ">" +
+      '<span class="cicon">' + icon + '</span><span><b>' + title + "</b><small>" + sub + "</small></span></button>";
+    box.innerHTML = '<div class="clubopts" role="radiogroup" aria-labelledby="clubLbl">' +
+      (own ? opt("own", art(ART.badge(c && c.badge)).replace('class="art"', 'class="art badge"') + '<i class="cdot"></i>', esc(own.name || "#" + own.tag), "#" + esc(own.tag) + (c && c.members ? " · " + c.members + " members" : "") + " · follows them if they move") : "") +
+      opt("other", '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>', "Another club", "Follow any club by its tag") +
+      opt("none", '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg>', "No club", "Only this player's own stats") +
+      "</div>" +
+      (H.clubMode === "other"
+        ? '<label class="tagfield sm' + (H.clubLook ? " found" : H.clubErr ? " bad" : "") + '" id="hClubField" for="hClub"><span class="hash" aria-hidden="true">#</span><input id="hClub" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="Club tag" aria-label="Club tag" value="' + esc(H.clubQ) + '"></label><div id="pvClubRes"></div>'
+        : "");
+    paintClubRes();
+  }
+  function paintClubRes() {
+    const box = $("#pvClubRes"); if (!box) return;
+    const f = $("#hClubField"); if (f) { f.classList.toggle("found", !!H.clubLook); f.classList.toggle("bad", !!H.clubErr); }
+    box.innerHTML = H.clubBusy ? '<div class="pv-wait"><i></i>Looking up #' + esc(normTag(H.clubQ)) + "</div>"
+      : H.clubErr ? '<div class="pv-err">' + esc(H.clubErr) + "</div>"
+      : H.clubLook ? '<div class="clubfound">' + art(ART.badge(H.clubLook.badge)).replace('class="art"', 'class="art badge"') + "<span><b>" + esc(H.clubLook.name) + "</b><small>" + (H.clubLook.members ? H.clubLook.members + " members · " : "") + fmt(H.clubLook.trophies) + " trophies</small></span></div>"
+      : "";
+  }
+  const readyToAdd = () => {
+    const L = H.look; if (!L) return false;
+    if (L.tracked) return true;
+    if (!CODE_RE.test(H.code.trim())) return false;
+    return H.clubMode !== "other" || !!H.clubLook;
+  };
+  function paintAction() {
+    const box = $("#pvAction"), L = H.look; if (!box || !L) return;
+    if (H.busy) {
+      box.innerHTML = '<div class="pv-wait big"><i></i><span>' + (L.tracked ? "Saving " + esc(L.player.name) + "…" : "Setting up " + esc(L.player.name) + ". Reading their stats" + (H.clubMode === "none" ? "" : " and club") + ", which takes about 15 seconds the first time.") + '</span></div><div class="pv-bar"><i></i></div>';
+      return;
+    }
+    box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this phone" : "Start tracking") + "</button>" +
+      (H.err ? '<div class="pv-err" role="alert">' + esc(H.err) + "</div>" : "");
+  }
+  let lookT = null, lookSeq = 0, clubT = null, clubSeq = 0;
+  function tagTyped(raw) {
+    H.q = raw; H.err = "";
+    const t = normTag(raw);
+    clearTimeout(lookT); lookSeq++;
+    H.look = null; H.lookErr = ""; H.lookBusy = false;
+    if (t && !/^[0289PYLQGRJCUV]*$/.test(t)) H.lookErr = "Player tags only use 0 2 8 9 P Y L Q G R J C U V. Check for a typo.";
+    else if (t.length >= 3) { H.lookBusy = true; lookT = setTimeout(() => lookupTag(t), 450); }
+    paintPreview();
+  }
+  async function lookupTag(t) {
+    const seq = ++lookSeq;
+    try {
+      const r = await callFn({ action: "profile_lookup", tag: t });
+      if (seq !== lookSeq) return;
+      H.look = r; H.clubMode = r.player.club ? "own" : "none"; H.clubQ = ""; H.clubLook = null; H.clubErr = "";
+    } catch (e) {
+      if (seq !== lookSeq) return;
+      H.lookErr = e.code === "player_not_found" ? "There's no player with the tag #" + t + ". Check it in Brawl Stars." : e.code === "bad_tag" ? "That isn't a player tag. Tags are 3 to 14 characters." : "Couldn't look that up. Check your connection and try again.";
+    }
+    H.lookBusy = false; paintPreview();
+  }
+  function clubTyped(raw) {
+    H.clubQ = raw; H.err = "";
+    const c = normTag(raw);
+    clearTimeout(clubT); clubSeq++;
+    H.clubLook = null; H.clubErr = ""; H.clubBusy = false;
+    if (c && !/^[0289PYLQGRJCUV]*$/.test(c)) H.clubErr = "Club tags only use 0 2 8 9 P Y L Q G R J C U V. Check for a typo.";
+    else if (c.length >= 3) { H.clubBusy = true; clubT = setTimeout(() => lookupClub(c), 450); }
+    paintClubRes(); paintAction();
+  }
+  async function lookupClub(c) {
+    const seq = ++clubSeq;
+    try {
+      const r = await callFn({ action: "profile_lookup", tag: H.look.player.tag, club: c });
+      if (seq !== clubSeq) return;
+      H.clubLook = r.club;
+    } catch (e) {
+      if (seq !== clubSeq) return;
+      H.clubErr = e.code === "club_not_found" || e.code === "bad_club" ? "There's no club with the tag #" + c + "." : "Couldn't look that up. Check your connection and try again.";
+    }
+    H.clubBusy = false; paintClubRes(); paintAction();
+  }
+  async function addProfile() {
+    const L = H.look;
+    if (!L || H.busy || !readyToAdd()) return;
+    const tag = L.player.tag, body = { action: "profile_add", tag };
+    if (!L.tracked) {
+      body.code = H.code.trim().toUpperCase();
+      if (H.clubMode === "none") body.club = "";
+      else if (H.clubMode === "other") body.club = H.clubLook.tag;
+    }
+    H.busy = true; H.err = ""; paintAction(); if (!L.tracked) paintClub();
+    try {
+      const r = await callFn(body);
+      PROFILES.upsert(cardOf(r.profile));
+      if (body.code) lsSet("code:" + tag, body.code); // whoever added it can set goals straight away
+      openProfile(tag);
+    } catch (e) {
+      H.busy = false;
+      H.err = e.code === "full" ? "The app is already tracking its limit of 20 players, so it can't add more right now."
+        : e.code === "bad_code" ? "The code needs 4 to 12 letters or numbers."
+        : e.code === "player_not_found" ? "Brawl Stars couldn't find that player just now. Try again."
+        : e.code === "club_not_found" ? "Brawl Stars couldn't find that club just now. Try again."
+        : "Couldn't add the player: " + String((e && e.message) || e).slice(0, 120);
+      paintAction(); if (!L.tracked) paintClub();
+    }
+  }
+  function openProfile(tag) {
+    PROFILES.setCurrent(tag);
+    if (tag === ME && canCloseHome()) { closeHome(); return; }
+    // Each player opens fresh, from its own saved copy.
+    $("#home").classList.add("leaving");
+    setTimeout(() => location.reload(), REDUCED() ? 0 : 170);
+  }
+  async function removeProfile(tag) {
+    if (lsGet("pushOn:" + tag)) {
+      try {
+        const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await callFn({ action: "push_unsubscribe", tag, endpoint: sub.endpoint }).catch(() => {});
+          if (!PROFILES.list().some((p) => p.tag !== tag && lsGet("pushOn:" + p.tag))) await sub.unsubscribe();
+        }
+      } catch (e) {}
+    }
+    ["code:", "pushPrefs:", "pushOn:"].forEach((k) => lsSet(k + tag, null));
+    idb("readwrite", (st) => st.delete("data:" + tag)).catch(() => {});
+    PROFILES.remove(tag);
+    if (tag === ME) PROFILES.setCurrent(null);
+    if (!PROFILES.list().length) { H.edit = false; showHome(); return; }
+    // The open player was removed: there's nothing to go back to until another one is picked.
+    if (!canCloseHome()) { const x = $("#home .home-x"); if (x) x.remove(); }
+    paintSaved();
+  }
+  function homeClick(t) {
+    if (t.dataset.open) { openProfile(t.dataset.open); return; }
+    if (t.dataset.remove) { removeProfile(t.dataset.remove); return; }
+    if (t.dataset.club) {
+      if (H.busy) return;
+      H.clubMode = t.dataset.club; H.err = "";
+      paintClub(); paintAction();
+      if (H.clubMode === "other") { const i = $("#hClub"); if (i) i.focus(); }
+      return;
+    }
+    const a = t.dataset.home;
+    if (a === "close" && canCloseHome()) closeHome();
+    else if (a === "edit") { H.edit = !H.edit; paintSaved(); }
+    else if (a === "add") addProfile();
+    else if (a === "open-look" && H.look) openProfile(H.look.player.tag);
+  }
 
   // ---------- boot ----------
   try { const t = localStorage.getItem("tab"); if (t && RENDER[t]) S.tab = t; } catch (e) {}
@@ -1728,14 +2195,30 @@ button:active { transform: scale(0.97); }
   window.addEventListener("hashchange", () => { const t = (location.hash || "").slice(1); if (RENDER[t] && t !== S.tab) { S.tab = t; render(); window.scrollTo({ top: 0 }); } });
 
   async function boot() {
-    try { S.ownerCode = localStorage.getItem("ownerCode") || null; } catch (e) {}
+    // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
+    if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+    const start = await pickProfile();
+    if (!start) { $("#skel").hidden = true; showHome(); return; } // first time on this phone
+    ME = start;
+    const card = PROFILES.list().find((p) => p.tag === ME) || {};
+    $("#hName").textContent = card.name || "#" + ME;
+    $("#hSub").textContent = "Player // #" + ME;
+    S.ownerCode = lsGet("code:" + ME);
     const cached = await cacheGet();
     if (cached && cached.v === CACHE_V && Array.isArray(cached.readings) && cached.readings.length) {
       S.readings = cached.readings; S.battleRows = cached.battleRows || []; S.goals = cached.goals || []; S.sessions = cached.sessions || [];
+      S.sessClub = cached.sessClub || (ME === LEGACY ? "2U0RP22G2" : null); S.profile = cached.profile || null;
       S.ver++; S.loaded = true; render();
     }
     try { await loadData(!S.readings.length); }
     catch (e) {
+      if (e && e.code === "unknown_profile") {
+        // The link or saved player isn't tracked (any more): offer to add it.
+        const t = ME; PROFILES.remove(t); PROFILES.setCurrent(null); ME = null;
+        $("#skel").hidden = true;
+        showHome({ prefill: t, note: "#" + t + " isn't being tracked. Add it below to start." });
+        return;
+      }
       showBanner(S.readings.length
         ? "<b>Couldn't reach the server.</b> Showing the stats saved on this device."
         : "<b>Couldn't load your stats.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" });
@@ -1747,8 +2230,6 @@ button:active { transform: scale(0.97); }
     setInterval(() => { if (due()) refreshLive(); }, 60e3);
     document.addEventListener("visibilitychange", () => { if (due()) refreshLive(); });
     setInterval(() => { if (document.visibilityState === "visible") render(); }, 60e3);
-    // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
-    if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
     pushInit();
   }
   boot();

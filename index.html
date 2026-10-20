@@ -327,6 +327,12 @@ section[data-tab] { display: grid; gap: 12px; }
 .rankrow { display: flex; align-items: center; gap: 14px; }
 .rankart { width: 58px; height: 58px; object-fit: contain; flex: none; }
 
+/* Switch (notification settings) */
+.toggle { flex: none; width: 46px; height: 28px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); position: relative; padding: 0; }
+.toggle i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform 0.18s ease, background-color 0.18s ease; }
+.toggle[aria-checked="true"] { background: rgba(39, 211, 195, 0.18); border-color: rgba(39, 211, 195, 0.6); }
+.toggle[aria-checked="true"] i { transform: translateX(18px); background: var(--teal); }
+
 /* Motion */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes glow { 0% { text-shadow: 0 0 0 transparent; } 25% { text-shadow: 0 0 22px currentColor; } 100% { text-shadow: 0 0 0 transparent; } }
@@ -405,6 +411,7 @@ button:active { transform: scale(0.97); }
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
     showAllMaps: false, showAllLog: false, goalKind: "player",
     chartMode: "time", open: { modes: false, maps: false, log: true }, confirmDel: null, dbWriteBlocked: false,
+    push: { supported: false, ios: false, standalone: false, permission: "default", endpoint: null, busy: false, msg: "", prefs: { goals: true, milestones: true, roster: true, recap: true } },
   };
   let D = null;
 
@@ -1081,7 +1088,7 @@ button:active { transform: scale(0.97); }
           (locked ? "" : confirming ? '<span class="row"><button class="btn ghost" data-del-cancel="1">Keep</button><button class="btn danger" data-del="' + esc(g.id) + '">Delete</button></span>' : '<button class="btn ghost" data-del-ask="' + esc(g.id) + '">Remove</button>') +
         "</div></div>";
     });
-    return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>');
+    return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>') + pushCard(locked);
   }
 
   function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + esc(msg) + "</div></div>"; }
@@ -1155,6 +1162,90 @@ button:active { transform: scale(0.97); }
       if (p >= 1) delete running[k];
     }
     if (Object.keys(running).length) countUps.raf = requestAnimationFrame(stepCounts);
+  }
+
+  // ---------- notifications ----------
+  const PUSH_KINDS = [["goals", "Goals reached"], ["milestones", "Trophy and club milestones"], ["roster", "Members joining or leaving"], ["recap", "Nightly recap at 10 PM"]];
+  function pushCard(locked) {
+    const P = S.push;
+    let inner;
+    if (!P.supported) {
+      inner = P.ios && !P.standalone
+        ? '<div class="sub">To get notifications on iPhone or iPad, add this app to your Home Screen (Share, then Add to Home Screen), open it from there, and turn them on here.</div>'
+        : '<div class="sub">This browser can\'t show notifications from web apps. On iPhone or iPad, open the app from your Home Screen.</div>';
+    } else if (locked) {
+      inner = '<div class="sub">Unlock goal editing above to turn on notifications for this device.</div>';
+    } else if (!P.endpoint) {
+      inner = '<div class="sub">Get an alert when you reach a goal, pass a trophy milestone (every 500 for you, every 5,000 for the club), when members join or leave, and a recap of your day at 10 PM.</div>' +
+        '<div class="row mt"><button class="btn" data-push="on"' + (P.busy ? " disabled" : "") + ">" + (P.busy ? "Turning on…" : "Turn on notifications") + "</button></div>";
+    } else {
+      inner = '<div class="list">' + PUSH_KINDS.map(([k, label]) =>
+          '<div class="li"><div class="main"><div class="t1">' + label + '</div></div><button class="toggle" role="switch" data-pref="' + k + '" aria-checked="' + (P.prefs[k] !== false) + '" aria-label="' + label + '"' + (P.busy ? " disabled" : "") + "><i></i></button></div>").join("") + "</div>" +
+        '<div class="row mt" style="justify-content:space-between"><button class="btn ghost" data-push="test"' + (P.busy ? " disabled" : "") + '>Send a test</button><button class="link" data-push="off"' + (P.busy ? " disabled" : "") + ">Turn off on this device</button></div>";
+    }
+    return '<div class="card" id="pushCard"><h2>Notifications<span class="sp"></span>' + (P.endpoint ? '<span class="aside up-t">On</span>' : "") + "</h2>" + inner +
+      (P.msg ? '<div class="sub mt" role="status">' + esc(P.msg) + "</div>" : "") + "</div>";
+  }
+  const b64urlBytes = (s) => { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+  async function pushInit() {
+    const P = S.push;
+    P.supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    P.ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    P.standalone = !!((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true);
+    try { Object.assign(P.prefs, JSON.parse(localStorage.getItem("pushPrefs") || "{}")); } catch (e) {}
+    if (!P.supported) return;
+    P.permission = Notification.permission;
+    try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); P.endpoint = sub ? sub.endpoint : null; } catch (e) {}
+    render();
+  }
+  async function pushOn() {
+    const P = S.push;
+    if (P.busy) return;
+    P.busy = true; P.msg = ""; render();
+    try {
+      // iPhone only allows this right after a tap, so it comes first.
+      const perm = await Notification.requestPermission();
+      P.permission = perm;
+      if (perm !== "granted") { P.msg = perm === "denied" ? "Notifications are blocked for this app. Turn them on in Settings › Notifications › Brawl Stats, then try again." : "Notifications weren't allowed."; return; }
+      const { key } = await callFn({ action: "push_key" });
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlBytes(key) }));
+      await callFn({ action: "push_subscribe", code: S.ownerCode, sub: sub.toJSON(), prefs: P.prefs });
+      P.endpoint = sub.endpoint;
+      P.msg = "Notifications are on for this device. Send a test to check.";
+    } catch (e) {
+      P.msg = e && e.code === "wrong_code" ? "That owner code no longer works. Unlock again first." : "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
+    } finally { P.busy = false; render(); }
+  }
+  async function pushOff() {
+    const P = S.push;
+    if (P.busy) return;
+    P.busy = true; P.msg = ""; render();
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) { await callFn({ action: "push_unsubscribe", endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+      P.endpoint = null; P.msg = "Notifications are off for this device.";
+    } catch (e) { P.msg = "Couldn't turn notifications off: " + String((e && e.message) || e).slice(0, 120); }
+    finally { P.busy = false; render(); }
+  }
+  async function pushTest() {
+    const P = S.push;
+    if (P.busy || !P.endpoint) return;
+    P.busy = true; P.msg = ""; render();
+    try { await callFn({ action: "push_test", code: S.ownerCode, endpoint: P.endpoint }); P.msg = "Test sent. It should arrive in a few seconds."; }
+    catch (e) { P.msg = e && e.code === "not_subscribed" ? "This device isn't registered any more. Turn notifications off and on again." : "The test didn't go through: " + String((e && e.message) || e).slice(0, 120); }
+    finally { P.busy = false; render(); }
+  }
+  async function pushPref(k) {
+    const P = S.push;
+    P.prefs[k] = P.prefs[k] === false;
+    try { localStorage.setItem("pushPrefs", JSON.stringify(P.prefs)); } catch (e) {}
+    render();
+    if (P.endpoint && S.ownerCode) {
+      try { await callFn({ action: "push_prefs", code: S.ownerCode, endpoint: P.endpoint, prefs: P.prefs }); }
+      catch (e) { P.prefs[k] = !P.prefs[k]; P.msg = "Couldn't save that setting. Try again."; render(); }
+    }
   }
 
   // ---------- render ----------
@@ -1246,6 +1337,8 @@ button:active { transform: scale(0.97); }
     if (t.dataset.delAsk) { S.confirmDel = t.dataset.delAsk; render(); return; }
     if (t.dataset.delCancel) { S.confirmDel = null; render(); return; }
     if (t.dataset.del) { const id = t.dataset.del; S.confirmDel = null; goalCall({ action: "goal_delete", id }); return; }
+    if (t.dataset.push) { if (t.dataset.push === "on") pushOn(); else if (t.dataset.push === "off") pushOff(); else pushTest(); return; }
+    if (t.dataset.pref) { pushPref(t.dataset.pref); return; }
     if (t.dataset.act === "lock") { S.ownerCode = null; try { localStorage.removeItem("ownerCode"); } catch (e) {} render(); return; }
   });
   document.addEventListener("input", (ev) => {
@@ -1318,6 +1411,7 @@ button:active { transform: scale(0.97); }
     if (pr && (pr.chart === "time" || pr.chart === "battle")) S.chartMode = pr.chart;
   } catch (e) {}
   const h = (location.hash || "").slice(1); if (RENDER[h]) S.tab = h; else if (h === "battles") S.tab = "me";
+  window.addEventListener("hashchange", () => { const t = (location.hash || "").slice(1); if (RENDER[t] && t !== S.tab) { S.tab = t; render(); window.scrollTo({ top: 0 }); } });
 
   async function boot() {
     try { S.ownerCode = localStorage.getItem("ownerCode") || null; } catch (e) {}
@@ -1341,6 +1435,7 @@ button:active { transform: scale(0.97); }
     setInterval(() => { if (document.visibilityState === "visible") render(); }, 60e3);
     // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
     if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+    pushInit();
   }
   boot();
 })();

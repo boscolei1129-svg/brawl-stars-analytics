@@ -3,11 +3,18 @@
 //   POST {action:"check_code", code}              confirm the owner code (unlocks goal editing)
 //   POST {action:"goal_add", code, kind, target, brawler?}
 //   POST {action:"goal_delete", code, id}
+//   POST {action:"push_key"}                       public key for turning on notifications
+//   POST {action:"push_subscribe", code, sub, prefs?} / {action:"push_prefs", code, endpoint, prefs}
+//   POST {action:"push_unsubscribe", endpoint} / {action:"push_test", code, endpoint}
+//   POST {action:"recap"}                          nightly summary notification (run by the schedule)
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import webpush from "npm:web-push@3.6.7";
 
 const ME = "8YRJ090Q2";
 const CLUB = "2U0RP22G2";
 const MIN_GAP_MS = 60_000; // refreshes closer together than this reuse the last reading
+const TZ = "Asia/Shanghai"; // "today" for the nightly recap
+const STEP_ME = 500, STEP_CLUB = 5000; // milestone sizes for notifications
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -216,7 +223,7 @@ async function refresh(src: string) {
 
   const now = new Date().toISOString();
   const row: Record<string, unknown> = { src, ts: now };
-  let saved = 0, stale = false, newFull: Record<string, unknown> | null = null;
+  let saved = 0, stale = false, newFull: Record<string, unknown> | null = null, fullNow: Record<string, any> | null = null;
   if (pr.status === "fulfilled") {
     const { player, brawlers, battles } = compactPlayer(pr.value);
     if (battles.length) {
@@ -237,16 +244,18 @@ async function refresh(src: string) {
       const delta: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(brawlers)) if (stable(full[k]) !== stable(v)) delta[k] = v;
       if (Object.keys(delta).length) { row.brawlers = delta; newFull = { ...full, ...delta }; }
+      fullNow = (newFull ?? full) as Record<string, any>;
     }
   }
-  let patched = false, live = 0, newClub: any = null;
+  let patched = false, live = 0, newClub: any = null, prevClub: any = null;
   if (cr.status === "fulfilled") {
     const club = compactClub(cr.value.data, cr.value.src);
     const fresh = await liveMembers(club);
     live = fresh.size;
     if (!fresh.has(ME) && typeof row.trophies === "number") patched = patchMyRow(club, row.trophies as number);
     row.club_trophies = club.trophies;
-    const change = clubChange(await clubFull(), club);
+    prevClub = await clubFull();
+    const change = clubChange(prevClub, club);
     if (change) { if (change.d) row.club_upd = change; else row.club = change; newClub = club; }
   }
   const result = {
@@ -276,7 +285,151 @@ async function refresh(src: string) {
     const { error: setErr } = await sb.from("settings").upsert({ key: "club_full", value: JSON.stringify(newClub) });
     if (setErr) throw setErr;
   }
-  return result;
+  let notified = 0;
+  try {
+    notified = await checkEvents({
+      trophies: typeof row.trophies === "number" ? row.trophies as number : null,
+      club: typeof row.club_trophies === "number" ? row.club_trophies as number : null,
+      elo: (row.player as any)?.elo ?? null, brawlers: fullNow, prevClub, newClub,
+    });
+  } catch (e) {
+    console.error("notifications failed", String((e as Error)?.message ?? e));
+  }
+  return { ...result, notified };
+}
+
+// ---------- notifications ----------
+async function setSetting(key: string, value: unknown) {
+  const { error } = await sb.from("settings").upsert({ key, value: typeof value === "string" ? value : JSON.stringify(value) });
+  if (error) throw error;
+}
+// Keys that identify this server to Apple's and Google's push services. Made once and kept private.
+async function vapid() {
+  const saved = await getSetting("vapid");
+  if (saved) return JSON.parse(saved);
+  const k = webpush.generateVAPIDKeys();
+  const v = { publicKey: k.publicKey, privateKey: k.privateKey, subject: "https://boscolei1129-svg.github.io/brawl-stars-analytics/" };
+  await setSetting("vapid", v);
+  return v;
+}
+async function pushTo(subs: any[], payload: unknown) {
+  if (!subs.length) return 0;
+  const v = await vapid();
+  webpush.setVapidDetails(v.subject, v.publicKey, v.privateKey);
+  let sent = 0;
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: "normal" });
+      sent++;
+      await sb.from("push_subs").update({ last_sent_at: new Date().toISOString() }).eq("endpoint", s.endpoint);
+    } catch (e: any) {
+      // 404/410: the device turned notifications off or the app was removed, so forget it.
+      if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("push_subs").delete().eq("endpoint", s.endpoint);
+      else console.error("push failed", e?.statusCode ?? "", e?.body ?? String(e));
+    }
+  }
+  return sent;
+}
+async function notify(kind: string, payload: unknown) {
+  const { data, error } = await sb.from("push_subs").select("*");
+  if (error) throw error;
+  return pushTo((data ?? []).filter((s: any) => s.prefs?.[kind] !== false), payload);
+}
+const fmtN = (n: number) => Math.round(n).toLocaleString("en-US");
+const sgnN = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmtN(Math.abs(n));
+const titleCase = (s: string) => String(s ?? "").toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase());
+
+// Goals reached, trophy milestones and roster changes since the last refresh. The first run only records
+// where things stand, so nothing old is announced.
+async function checkEvents(cur: { trophies: number | null; club: number | null; elo: number | null; brawlers: Record<string, any> | null; prevClub: any; newClub: any }) {
+  const raw = await getSetting("notify_state");
+  const first = !raw;
+  const st = raw ? JSON.parse(raw) : {};
+  const out: { kind: string; payload: unknown }[] = [];
+  if (cur.trophies != null) {
+    const m = Math.floor(cur.trophies / STEP_ME) * STEP_ME;
+    if (st.me == null) st.me = m;
+    else if (m > st.me) {
+      out.push({ kind: "milestones", payload: { title: "🏆 " + fmtN(m) + " trophies", body: "You just passed " + fmtN(m) + ". Now at " + fmtN(cur.trophies) + ".", tag: "me-milestone", url: "./#me" } });
+      st.me = m;
+    }
+  }
+  if (cur.club != null) {
+    const m = Math.floor(cur.club / STEP_CLUB) * STEP_CLUB;
+    if (st.club == null) st.club = m;
+    else if (m > st.club) {
+      out.push({ kind: "milestones", payload: { title: "⭐ Stargazers passed " + fmtN(m), body: "The club is at " + fmtN(cur.club) + " trophies.", tag: "club-milestone", url: "./#club" } });
+      st.club = m;
+    }
+  }
+  const { data: goals } = await sb.from("goals").select("*");
+  st.goals = Array.isArray(st.goals) ? st.goals : [];
+  for (const g of goals ?? []) {
+    if (st.goals.includes(g.id)) continue;
+    const b = g.kind === "brawler" ? cur.brawlers?.[g.brawler] : null;
+    const v = g.kind === "player" ? cur.trophies : g.kind === "club" ? cur.club : g.kind === "elo" ? cur.elo : b ? b[0] : null;
+    if (v == null || v < g.target) continue;
+    st.goals.push(g.id);
+    if (first || (g.start != null && g.start >= g.target)) continue; // already there when it was set
+    const name = g.kind === "player" ? fmtN(g.target) + " trophies" : g.kind === "club" ? "Club at " + fmtN(g.target)
+      : g.kind === "elo" ? fmtN(g.target) + " Elo" : titleCase(b?.[3] ?? g.brawler) + " at " + fmtN(g.target);
+    out.push({ kind: "goals", payload: { title: "🎯 Goal reached", body: name + ". Now at " + fmtN(v) + ".", tag: "goal-" + g.id, url: "./#goals" } });
+  }
+  st.goals = st.goals.filter((id: string) => (goals ?? []).some((g: any) => g.id === id));
+  if (!first && cur.prevClub?.members && cur.newClub?.members) {
+    const before = new Map(cur.prevClub.members.map((m: any[]) => [m[0], m[1]]));
+    const after = new Map(cur.newClub.members.map((m: any[]) => [m[0], m[1]]));
+    const joined = [...after].filter(([t]) => !before.has(t)).map(([, n]) => n);
+    const left = [...before].filter(([t]) => !after.has(t)).map(([, n]) => n);
+    const list = (a: string[]) => (a.length <= 2 ? a.join(" and ") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]);
+    if (joined.length || left.length) {
+      const parts = [joined.length ? list(joined) + " joined" : "", left.length ? list(left) + " left" : ""].filter(Boolean);
+      out.push({ kind: "roster", payload: { title: "👋 Stargazers members", body: parts.join(". ") + ". The club has " + after.size + "/30.", tag: "roster", url: "./#club" } });
+    }
+  }
+  await setSetting("notify_state", st);
+  let sent = 0;
+  for (const o of out) sent += await notify(o.kind, o.payload);
+  return sent;
+}
+
+// Nightly summary of today's battles and club change, in the TZ time zone.
+async function recap() {
+  const now = new Date();
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(now).map((x) => [x.type, x.value]));
+  const today = `${p.year}-${p.month}-${p.day}`;
+  const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(now.getTime() / 60000) * 60000;
+  const midnight = new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - offset).toISOString();
+  const st = JSON.parse((await getSetting("notify_state")) ?? "{}");
+  if (st.recap === today) return { ok: true, skipped: "already sent today" };
+  const { data: bs, error } = await sb.from("battles").select("win, tc").gte("t", midnight);
+  if (error) throw error;
+  const n = bs?.length ?? 0, w = (bs ?? []).filter((b: any) => b.win === true).length, l = (bs ?? []).filter((b: any) => b.win === false).length;
+  const net = (bs ?? []).reduce((a: number, b: any) => a + (b.tc ?? 0), 0);
+  const at = async (col: string, before: boolean) => {
+    let q = sb.from("readings").select(col).not(col, "is", null);
+    q = before ? q.lte("ts", midnight).order("ts", { ascending: false }) : q.order("ts", { ascending: false });
+    const { data } = await q.limit(1);
+    return (data?.[0] as any)?.[col] ?? null;
+  };
+  const [club0, club1, me1] = await Promise.all([at("club_trophies", true), at("club_trophies", false), at("trophies", false)]);
+  const clubDelta = club0 != null && club1 != null ? club1 - club0 : 0;
+  st.recap = today;
+  await setSetting("notify_state", st);
+  if (!n && !clubDelta) return { ok: true, skipped: "nothing happened today" };
+  const body = (n ? n + (n === 1 ? " battle" : " battles") + " · " + sgnN(net) + " trophies" + (w + l ? " · " + Math.round((w / (w + l)) * 100) + "% wins" : "") : "No battles today")
+    + (me1 != null ? " · now " + fmtN(me1) : "") + (clubDelta ? ". Club " + sgnN(clubDelta) + " today." : ".");
+  const sent = await notify("recap", { title: "🌙 Today in Brawl Stars", body, tag: "recap", url: "./#me" });
+  return { ok: true, sent };
+}
+
+const PREF_KEYS = ["goals", "milestones", "roster", "recap"];
+const cleanPrefs = (p: any) => Object.fromEntries(PREF_KEYS.map((k) => [k, p?.[k] !== false]));
+function cleanSub(sub: any) {
+  const endpoint = String(sub?.endpoint ?? ""), p256dh = String(sub?.keys?.p256dh ?? ""), auth = String(sub?.keys?.auth ?? "");
+  if (!/^https:\/\//.test(endpoint) || !p256dh || !auth || endpoint.length > 1000) return null;
+  return { endpoint, p256dh, auth };
 }
 
 async function sha256(text: string) {
@@ -337,6 +490,47 @@ Deno.serve(async (req) => {
         if (error) throw error;
         return json({ ok: true });
       }
+      case "push_key":
+        return json({ ok: true, key: (await vapid()).publicKey });
+      case "push_subscribe": {
+        if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
+        const sub = cleanSub(body.sub);
+        if (!sub) return json({ ok: false, error: "bad_subscription" }, 400);
+        const { error } = await sb.from("push_subs").upsert({ ...sub, prefs: cleanPrefs(body.prefs) });
+        if (error) throw error;
+        return json({ ok: true });
+      }
+      case "push_prefs": {
+        if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
+        const { error } = await sb.from("push_subs").update({ prefs: cleanPrefs(body.prefs) }).eq("endpoint", String(body.endpoint ?? ""));
+        if (error) throw error;
+        return json({ ok: true });
+      }
+      case "push_unsubscribe": {
+        const { error } = await sb.from("push_subs").delete().eq("endpoint", String(body.endpoint ?? ""));
+        if (error) throw error;
+        return json({ ok: true });
+      }
+      case "push_test": {
+        if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
+        const { data } = await sb.from("push_subs").select("*").eq("endpoint", String(body.endpoint ?? ""));
+        if (!data?.length) return json({ ok: false, error: "not_subscribed" }, 404);
+        const sent = await pushTo(data, { title: "✅ Notifications are on", body: "You'll hear about goals, milestones, club changes and get a nightly recap.", tag: "test", url: "./#goals" });
+        return json({ ok: sent > 0, sent, error: sent ? null : "push_failed" });
+      }
+      case "push_selftest": {
+        // Builds (but doesn't send) an encrypted push for a test subscription, to check the crypto works here.
+        if (!(await codeOk(body.code))) return json({ ok: false, error: "wrong_code" }, 403);
+        const sub = cleanSub(body.sub);
+        if (!sub) return json({ ok: false, error: "bad_subscription" }, 400);
+        const v = await vapid();
+        const d = webpush.generateRequestDetails({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify({ title: "selftest" }),
+          { vapidDetails: { subject: v.subject, publicKey: v.publicKey, privateKey: v.privateKey }, TTL: 60 });
+        const bodyB64 = btoa(String.fromCharCode(...new Uint8Array(d.body)));
+        return json({ ok: true, publicKey: v.publicKey, headers: d.headers, body: bodyB64 });
+      }
+      case "recap":
+        return json(await recap());
       default:
         return json({ ok: false, error: "unknown_action" }, 400);
     }

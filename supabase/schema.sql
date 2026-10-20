@@ -43,7 +43,8 @@ create table public.settings (
   key text primary key,
   value text not null
 );
--- settings also holds 'brawlers_full' and 'club_full' (the current full lists), written by the function.
+-- settings also holds 'brawlers_full' and 'club_full' (the current full lists), 'vapid' (the server's
+-- private push keys) and 'notify_state' (what was last announced), all written by the function.
 -- insert into public.settings values ('owner_code_sha256', encode(sha256(convert_to('YOURCODE', 'UTF8')), 'hex'));
 
 alter table public.readings enable row level security;
@@ -65,6 +66,28 @@ select cron.schedule(
   $$ select net.http_post(
        url := 'https://iuukdskmzjglpvtlwldw.supabase.co/functions/v1/brawl',
        body := '{"action":"refresh","src":"auto"}'::jsonb,
+       headers := '{"Content-Type":"application/json"}'::jsonb,
+       timeout_milliseconds := 60000) $$
+);
+
+-- Devices that turned on notifications. Private: only the server function reads or writes it.
+create table public.push_subs (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  prefs jsonb not null default '{"goals": true, "milestones": true, "roster": true, "recap": true}'::jsonb,
+  created_at timestamptz not null default now(),
+  last_sent_at timestamptz
+);
+alter table public.push_subs enable row level security;
+
+-- Nightly recap notification at 10 PM Shanghai time (14:00 UTC).
+select cron.schedule(
+  'brawl-recap',
+  '0 14 * * *',
+  $$ select net.http_post(
+       url := 'https://iuukdskmzjglpvtlwldw.supabase.co/functions/v1/brawl',
+       body := '{"action":"recap"}'::jsonb,
        headers := '{"Content-Type":"application/json"}'::jsonb,
        timeout_milliseconds := 60000) $$
 );

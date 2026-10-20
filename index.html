@@ -534,7 +534,7 @@ button:active { transform: scale(0.97); }
     const next = () => {
       if (i >= todo.length) return;
       const src = todo[i++], im = new Image();
-      im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { ART_OK.set(src, im); next(); }); };
+      im.onload = () => { ART_OK.set(src, im); if (im.decode) im.decode().catch(() => {}); next(); };
       im.onerror = next;
       im.src = src;
     };

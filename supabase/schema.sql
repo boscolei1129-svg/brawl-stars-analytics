@@ -231,3 +231,79 @@ create table if not exists public.profile_adders (
 create index if not exists profile_adders_tag_idx on public.profile_adders (tag);
 alter table public.profile_adders enable row level security;
 revoke all on public.profile_adders from anon, authenticated;
+
+-- Explore (looking at any player or club without tracking), safe slot claims and usage counts.
+-- Short-lived copies of public game data that Explore has fetched, shared by everyone. Only the server function
+-- reads or writes it; entries older than a day are deleted every hour.
+create table if not exists public.explore_cache (
+  key text primary key,
+  body jsonb not null,
+  fetched_at timestamptz not null default now()
+);
+create index if not exists explore_cache_fetched_idx on public.explore_cache (fetched_at);
+alter table public.explore_cache enable row level security;
+revoke all on public.explore_cache from anon, authenticated;
+
+-- Hourly counts of what the server does (lookups, cache hits, game API calls, limits hit). No identifiers.
+create table if not exists public.usage_counters (
+  key text not null,
+  hour timestamptz not null,
+  n integer not null default 0,
+  primary key (key, hour)
+);
+alter table public.usage_counters enable row level security;
+revoke all on public.usage_counters from anon, authenticated;
+
+create or replace function public.count_usage(p_keys text[])
+returns void language sql security definer set search_path = public as $$
+  insert into public.usage_counters as u (key, hour, n)
+  select k, date_trunc('hour', now()), count(*) from unnest(p_keys) k group by k
+  on conflict (key, hour) do update set n = u.n + excluded.n;
+$$;
+revoke execute on function public.count_usage(text[]) from public, anon, authenticated;
+grant execute on function public.count_usage(text[]) to service_role;
+
+-- Takes a tracking spot in one locked step, so two requests at the same moment can't both take the last spot.
+-- With an owner: starts the profile (inserting p_row if it's new, or waking it if paused) when the app has fewer
+-- than p_max active profiles and the owner holds fewer than p_per, and records the owner as holding it.
+-- Without an owner: only wakes a paused profile, when the app has room.
+create or replace function public.claim_slot(p_owner uuid, p_tag text, p_row jsonb, p_max integer, p_per integer)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  cur public.profiles%rowtype;
+  n_active integer;
+  held text[];
+begin
+  perform pg_advisory_xact_lock(hashtext('brawl:claim_slot'));
+  select * into cur from public.profiles where tag = p_tag;
+  if cur.tag is not null and cur.active then
+    return jsonb_build_object('status', 'exists');
+  end if;
+  select count(*) into n_active from public.profiles where active;
+  if n_active >= p_max then
+    return jsonb_build_object('status', 'full');
+  end if;
+  if p_owner is not null then
+    select coalesce(array_agg(a.tag order by a.created_at), '{}') into held
+      from public.profile_adders a join public.profiles p on p.tag = a.tag
+      where a.owner = p_owner and p.active;
+    if coalesce(array_length(held, 1), 0) >= p_per then
+      return jsonb_build_object('status', 'phone_full', 'held', to_jsonb(held));
+    end if;
+  end if;
+  if cur.tag is not null then
+    update public.profiles set active = true, last_open_at = now() where tag = p_tag;
+  elsif p_row is not null then
+    insert into public.profiles (tag, club, name, icon, trophies, club_name, club_badge, follow)
+    values (p_tag, p_row->>'club', p_row->>'name', (p_row->>'icon')::bigint, (p_row->>'trophies')::integer,
+            p_row->>'club_name', (p_row->>'club_badge')::bigint, coalesce((p_row->>'follow')::boolean, true));
+  else
+    return jsonb_build_object('status', 'missing');
+  end if;
+  if p_owner is not null then
+    insert into public.profile_adders (owner, tag) values (p_owner, p_tag) on conflict do nothing;
+  end if;
+  return jsonb_build_object('status', 'ok');
+end $$;
+revoke execute on function public.claim_slot(uuid, text, jsonb, integer, integer) from public, anon, authenticated;
+grant execute on function public.claim_slot(uuid, text, jsonb, integer, integer) to service_role;

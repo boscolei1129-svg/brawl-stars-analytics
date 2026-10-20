@@ -5,8 +5,8 @@ const { transformSync } = require("esbuild");
 const crypto = require("crypto");
 
 function makeDb() {
-  const T = { profiles: [], profile_codes: [], readings: [], battles: [], goals: [], sessions: [], settings: [], push_subs: [], device_keys: [], device_links: [], rate_hits: [], profile_adders: [] };
-  const PK = { profiles: ["tag"], profile_codes: ["tag"], settings: ["key"], push_subs: ["endpoint", "tag"], device_keys: ["key_hash"], device_links: ["code_hash"], profile_adders: ["owner", "tag"], goals: ["id"], battles: ["tag", "t"] };
+  const T = { profiles: [], profile_codes: [], readings: [], battles: [], goals: [], sessions: [], settings: [], push_subs: [], device_keys: [], device_links: [], rate_hits: [], profile_adders: [], explore_cache: [], usage_counters: [] };
+  const PK = { profiles: ["tag"], profile_codes: ["tag"], settings: ["key"], push_subs: ["endpoint", "tag"], device_keys: ["key_hash"], device_links: ["code_hash"], profile_adders: ["owner", "tag"], explore_cache: ["key"], usage_counters: ["key", "hour"], goals: ["id"], battles: ["tag", "t"] };
   const clock = { now: () => Date.now() };
   const cmp = (a, b) => (a == null && b == null ? 0 : a == null ? -1 : b == null ? 1 : a < b ? -1 : a > b ? 1 : 0);
   const val = (v) => (typeof v === "string" && /^\d{4}-\d\d-\d\dT/.test(v) ? Date.parse(v) : v);
@@ -76,7 +76,28 @@ function makeDb() {
       return { data: out, error: null, count };
     }
   }
+  const fail = { rate_hit: false };
   const rpc = async (name, a) => {
+    if (fail[name]) return { data: null, error: { message: "boom" } };
+    if (name === "count_usage") {
+      const hour = new Date(Math.floor(clock.now() / 3600e3) * 3600e3).toISOString();
+      for (const k of a.p_keys) { let r = T.usage_counters.find((x) => x.key === k && x.hour === hour); if (!r) T.usage_counters.push((r = { key: k, hour, n: 0 })); r.n++; }
+      return { data: null, error: null };
+    }
+    if (name === "claim_slot") { // same rules as the SQL function (which runs under a lock: no await in here)
+      const cur = T.profiles.find((p) => p.tag === a.p_tag);
+      if (cur && cur.active) return { data: { status: "exists" }, error: null };
+      if (T.profiles.filter((p) => p.active).length >= a.p_max) return { data: { status: "full" }, error: null };
+      if (a.p_owner) {
+        const held = T.profile_adders.filter((x) => x.owner === a.p_owner && T.profiles.some((p) => p.tag === x.tag && p.active)).map((x) => x.tag);
+        if (held.length >= a.p_per) return { data: { status: "phone_full", held }, error: null };
+      }
+      if (cur) Object.assign(cur, { active: true, last_open_at: new Date(clock.now()).toISOString() });
+      else if (a.p_row) T.profiles.push({ follow: true, ...a.p_row, tag: a.p_tag, active: true, keep: false, created_at: new Date(clock.now()).toISOString(), last_open_at: new Date(clock.now()).toISOString() });
+      else return { data: { status: "missing" }, error: null };
+      if (a.p_owner && !T.profile_adders.some((x) => x.owner === a.p_owner && x.tag === a.p_tag)) T.profile_adders.push({ owner: a.p_owner, tag: a.p_tag, created_at: new Date(clock.now()).toISOString() });
+      return { data: { status: "ok" }, error: null };
+    }
     if (name !== "rate_hit") return { data: null, error: { message: "no rpc" } };
     const b = Math.floor(clock.now() / 1000 / Math.max(a.p_window, 1));
     let r = T.rate_hits.find((x) => x.key === a.p_key && x.bucket === b);
@@ -84,10 +105,10 @@ function makeDb() {
     r.n++;
     return { data: r.n <= a.p_max, error: null };
   };
-  return { T, clock, client: { from: (t) => new Q(t), rpc } };
+  return { T, clock, fail, client: { from: (t) => new Q(t), rpc } };
 }
 
-function load(file, { player } = {}) {
+function load(file, { player, fetch: customFetch } = {}) {
   const db = makeDb();
   const sent = [];
   let src = fs.readFileSync(file, "utf8")
@@ -112,7 +133,7 @@ function load(file, { player } = {}) {
     return new Response("{}", { status: 404 });
   };
   const fastTimeout = (fn) => setImmediate(fn); // the server's deliberate delays would only slow the tests
-  new Function("__mock", "__webpush", "Deno", "fetch", "require", "module", "exports", "setTimeout", js)({ createClient: () => db.client }, webpush, Deno, fakeFetch, require, { exports: {} }, {}, fastTimeout);
+  new Function("__mock", "__webpush", "Deno", "fetch", "require", "module", "exports", "setTimeout", js)({ createClient: () => db.client }, webpush, Deno, customFetch || fakeFetch, require, { exports: {} }, {}, fastTimeout);
   const call = async (body, ip = "203.0.113.1", headers = {}) => {
     const req = new Request("https://x.test/functions/v1/brawl", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip, "x-forwarded-for": ip, ...headers }, body: JSON.stringify(body) });
     const res = await handler(req);

@@ -696,14 +696,212 @@ button:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
   .sync.busy i { animation: none; }
 }
+
+/* My stats / Explore switch */
+.modesw { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); background: rgba(20, 23, 28, 0.6); }
+.modesw button {
+  min-height: 40px; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.modesw button + button { border-left: 1px solid var(--line); }
+.modesw button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; flex: none; }
+.modesw button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.modesw button[data-xmode="explore"][aria-current="page"] { background: var(--teal-soft); color: var(--teal); }
+.top .modesw { max-width: 520px; }
+
+/* Explore: a full screen of its own, over My stats */
+html.xpopen, html.xpopen body { overflow: hidden; }
+.xp { position: fixed; inset: 0; z-index: 110; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; animation: homein 0.22s ease-out both; }
+.xp-sky { position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(700px 380px at 85% -140px, rgba(39, 211, 195, 0.14), transparent 70%), radial-gradient(520px 300px at 0 -60px, rgba(255, 122, 26, 0.09), transparent 70%); }
+.xp-in { position: relative; max-width: 560px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 32px) max(16px, env(safe-area-inset-left, 0px)); }
+.xp-top { position: sticky; top: 0; z-index: 3; display: grid; gap: 10px; padding: 0 0 10px;
+  margin: 0 -16px; padding-left: 16px; padding-right: 16px; padding-top: 2px;
+  background: rgba(12, 14, 17, 0.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.xp-bar { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.xp-back { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface); padding: 0; }
+.xp-back svg { width: 16px; height: 16px; fill: none; stroke: var(--fg); stroke-width: 2; stroke-linecap: square; }
+.xp-crumb { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--teal); }
+.xp-body { display: grid; gap: 12px; padding-top: 6px; }
+.xp-h { margin: 8px 0 0; font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: 0.5px; outline: none; }
+.xp-h span { color: var(--teal); }
+.xp-lede { margin: 6px 0 4px; color: var(--fg-2); font-size: 15px; line-height: 1.5; }
+.xp-search { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px 16px; display: grid; gap: 12px; }
+.xp-search .row2 { display: flex; gap: 10px; align-items: flex-end; }
+.xp-search .tagfield { flex: 1; }
+.xp-search .tagfield .hash, .xp-search .tagfield input { font-size: 24px; letter-spacing: 2px; }
+.xp-go { min-height: 44px; min-width: 64px; }
+.xp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.xtile { text-align: left; display: grid; gap: 6px; align-content: start; min-height: 108px; padding: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); position: relative; overflow: hidden; }
+.xtile:active { background: var(--raise); }
+.xtile .fi { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(255, 122, 26, 0.45); background: var(--accent-soft); }
+.xtile .fi svg { width: 18px; height: 18px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: miter; }
+.xtile.t .fi { border-color: rgba(39, 211, 195, 0.45); background: var(--teal-soft); }
+.xtile.t .fi svg { stroke: var(--teal); }
+.xtile b { font-size: 15px; letter-spacing: 0.4px; text-transform: uppercase; }
+.xtile small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.xchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.xchip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px 0 4px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 13.5px; font-weight: 600; max-width: 100%; }
+.xchip .mono { width: 34px; height: 34px; font-size: 11px; }
+.xchip span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xchip small { color: var(--muted); font-family: var(--font-num); font-size: 11px; font-weight: 500; }
+.xsec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 -2px; }
+.xsec-h h2 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 2.2px; text-transform: uppercase; color: var(--muted); }
+.xsoon { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border: 1px dashed var(--line); color: var(--fg-2); font-size: 13.5px; line-height: 1.45; }
+.xsoon b { color: var(--fg); }
+.xsoon svg { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--teal); stroke-width: 1.5; }
+.xhome, .xcols, .xhome > div, .xcols > div { display: grid; gap: 12px; min-width: 0; }
+.seg.fill { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100%; }
+.seg.fill button { padding: 9px 4px; letter-spacing: 0.6px; min-height: 40px; }
+.xp-foot { margin: 22px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; display: grid; gap: 4px; }
+
+/* Player */
+.xhero { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: center; }
+.xhero .mono.av { width: 64px; height: 64px; font-size: 18px; }
+.xhero h1 { margin: 0; font-size: 26px; line-height: 1.1; font-weight: 700; letter-spacing: 0.5px; overflow-wrap: anywhere; outline: none; }
+.xhero .tg { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); }
+.xhero-num { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.xhero-num .hero-num { font-size: 44px; }
+.xhero-num .pk { color: var(--fg-2); font-family: var(--font-num); font-size: 12.5px; text-transform: uppercase; }
+.xclub { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--fg-2); font-size: 13.5px; min-height: 32px; text-align: left; }
+.xclub .badge { width: 18px; height: 18px; object-fit: contain; }
+.xclub b { color: var(--teal); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(39, 211, 195, 0.4); text-underline-offset: 3px; }
+.xacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.xact { min-height: 44px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font-size: 11.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; }
+.xact svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+.xact[aria-pressed="true"] { color: var(--accent); border-color: rgba(255, 122, 26, 0.55); background: var(--accent-soft); }
+.xact[aria-pressed="true"] svg { fill: var(--accent); }
+.xact.go { border-color: rgba(39, 211, 195, 0.5); color: var(--teal); background: var(--teal-soft); }
+.xfresh { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.45; display: flex; gap: 8px; align-items: flex-start; }
+.xfresh span { min-width: 0; }
+.xfresh i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex: none; margin-top: 6px; }
+.xfresh.stale i { background: var(--accent); }
+.xsince { border-left: 2px solid var(--teal); }
+.xsince ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.xsince li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--fg-2); }
+.xsince li b { font-family: var(--font-num); font-weight: 700; }
+.xtrack { border: 1px solid rgba(39, 211, 195, 0.35); background: linear-gradient(180deg, rgba(39, 211, 195, 0.08), rgba(39, 211, 195, 0) 60%), var(--surface); }
+.xtrack p { margin: 0 0 12px; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+.xmsg { margin-top: 10px; font-size: 13.5px; line-height: 1.45; }
+.xmsg.bad { color: var(--bad); }
+.xstat3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-bottom: 12px; border: 1px solid var(--line); }
+.xstat3 > div { padding: 10px 12px; border-right: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; }
+.xstat3 > div:last-child { border-right: 0; }
+.xstat3 .k { font-size: 10.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.xstat3 .v { font-family: var(--font-num); font-weight: 700; font-size: 20px; }
+.xstat3 .n { color: var(--muted); font-size: 11.5px; font-family: var(--font-num); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-2); }
+.xbar:first-child { border-top: 0; }
+.xbar .nm { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; font-size: 14px; }
+.xbar .nm span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xbar .nm .mono { width: 30px; height: 30px; font-size: 10px; }
+.xbar .end { font-family: var(--font-num); font-size: 12.5px; color: var(--fg-2); text-align: right; white-space: nowrap; }
+.xbar .meter { grid-column: 1 / -1; margin-top: 0; }
+.xmore { width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid var(--line); background: none; color: var(--accent); font-size: 11.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.xlog { display: grid; grid-template-columns: 50px 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-2); }
+.xlog:first-child { border-top: 0; }
+.xlog .mono { width: 30px; height: 30px; font-size: 10px; }
+.xlog .nm { font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xlog .nm .star { color: var(--accent); margin-left: 4px; }
+.xlog .ds { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xlog .tc { font-family: var(--font-num); font-weight: 700; font-size: 13px; text-align: right; }
+.xskel { display: grid; gap: 12px; }
+.xerr { padding: 18px 16px; border: 1px solid rgba(255, 107, 107, 0.4); background: var(--bad-soft); display: grid; gap: 12px; }
+.xerr b { font-size: 16px; }
+.xerr p { margin: 0; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+.xerr .btn { justify-self: start; min-height: 44px; }
+
+/* Head-to-head */
+.xvs-form { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); gap: 10px; align-items: end; }
+.xvs-form .tagfield .hash, .xvs-form .tagfield input { font-size: 19px; letter-spacing: 1.5px; }
+.xvs-form label.k-label { display: block; margin-bottom: 4px; }
+.xswap { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--raise); padding: 0; }
+.xswap svg { width: 18px; height: 18px; fill: none; stroke: var(--fg-2); stroke-width: 1.8; }
+.xvs-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; text-align: center; }
+.xvs-p { display: grid; justify-items: center; gap: 6px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; }
+.xvs-p .mono.av { width: 64px; height: 64px; font-size: 18px; }
+.xvs-p.a .mono.av { border-color: rgba(255, 122, 26, 0.7); box-shadow: 0 0 24px rgba(255, 122, 26, 0.25); }
+.xvs-p.b .mono.av { border-color: rgba(39, 211, 195, 0.7); box-shadow: 0 0 24px rgba(39, 211, 195, 0.22); }
+.xvs-p b { font-size: 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xvs-p small { font-family: var(--font-num); color: var(--muted); font-size: 11.5px; }
+.xvs-p .t { font-family: var(--font-num); font-weight: 700; font-size: 17px; display: inline-flex; align-items: center; gap: 5px; }
+.xvs-mark { font-weight: 700; font-size: 30px; letter-spacing: 1px; background: linear-gradient(135deg, var(--accent), var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; animation: vsin 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes vsin { from { opacity: 0; transform: scale(1.6); } }
+.xcmp { display: grid; gap: 0; }
+.xrow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.xrow:first-child { border-top: 0; }
+.xrow .lab { grid-column: 2; text-align: center; font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.xrow .va, .xrow .vb { font-family: var(--font-num); font-size: 15px; color: var(--fg-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xrow .va { text-align: left; grid-column: 1; grid-row: 1; }
+.xrow .vb { text-align: right; grid-column: 3; grid-row: 1; }
+.xrow .lead { color: var(--fg); font-weight: 700; }
+.xrow .va.lead::after { content: " ◂"; color: var(--accent); font-size: 11px; }
+.xrow .vb.lead::before { content: "▸ "; color: var(--teal); font-size: 11px; }
+.xrow .dual { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; height: 5px; }
+.xrow .dual i { display: block; height: 100%; background: var(--line-2); position: relative; }
+.xrow .dual i b { position: absolute; top: 0; bottom: 0; }
+.xrow .dual i:first-child b { right: 0; background: var(--accent); }
+.xrow .dual i:last-child b { left: 0; background: var(--teal); }
+.xrow .sub2 { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 11.5px; font-family: var(--font-num); }
+.xnote { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 10px; }
+.xnote.warn { color: var(--fg-2); border-left: 2px solid var(--accent); padding-left: 10px; }
+
+/* Club scout */
+.xclubh { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: center; }
+.xclubh .badgebox { width: 64px; height: 64px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--raise); position: relative; font-weight: 700; }
+.xclubh .badgebox .art { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
+.xdesc { margin: 12px 0 0; color: var(--fg-2); font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.xhist { display: grid; gap: 6px; }
+.xhist .hr { display: grid; grid-template-columns: 112px minmax(0, 1fr) 28px; gap: 10px; align-items: center; font-family: var(--font-num); font-size: 12px; color: var(--fg-2); }
+.xhist .hr .meter { margin: 0; height: 10px; }
+.xhist .hr span:last-child { text-align: right; color: var(--fg); }
+.xmem { width: 100%; display: grid; grid-template-columns: 24px 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border: 0; border-top: 1px solid var(--line-2); background: none; color: inherit; text-align: left; min-height: 50px; }
+.xmem:first-child { border-top: 0; }
+.xmem .mono { width: 34px; height: 34px; font-size: 11px; }
+.xmem .nm { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xmem .end { font-family: var(--font-num); font-size: 13px; text-align: right; }
+.xmem .end small { display: block; color: var(--muted); font-size: 11px; }
+
+/* Home screen: a way into Explore without tracking anyone */
+.xpromo { width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) 18px; gap: 12px; align-items: center; text-align: left; padding: 14px; border: 1px solid rgba(39, 211, 195, 0.35); background: linear-gradient(90deg, rgba(39, 211, 195, 0.1), rgba(39, 211, 195, 0) 70%), var(--surface); color: var(--fg); min-height: 64px; }
+.xpromo .fi { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid rgba(39, 211, 195, 0.45); background: var(--teal-soft); }
+.xpromo .fi svg { width: 20px; height: 20px; fill: none; stroke: var(--teal); stroke-width: 1.7; }
+.xpromo b { display: block; font-size: 15px; }
+.xpromo small { display: block; color: var(--fg-2); font-size: 13px; line-height: 1.4; margin-top: 2px; }
+.xpromo > svg { width: 16px; height: 16px; fill: none; stroke: var(--teal); stroke-width: 2; }
+
+@media (min-width: 768px) {
+  .xp-in { max-width: 1080px; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+  .xp-top { margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+  .xp-top .modesw { max-width: 420px; }
+  .xp-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .xcols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 16px; align-items: start; }
+  .xcols > div { display: grid; gap: 12px; min-width: 0; }
+  .xhome { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .xhome > div { display: grid; gap: 12px; min-width: 0; }
+  .xp-h { font-size: 52px; }
+}
+@media (max-width: 360px) {
+  .xp-h { font-size: 34px; }
+  .xacts { grid-template-columns: 1fr 1fr; }
+  .xacts .xact:last-child { grid-column: 1 / -1; }
+  .xstat3 .v { font-size: 17px; }
+  .xvs-form { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); gap: 6px; }
+  .xhist .hr { grid-template-columns: 96px minmax(0, 1fr) 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .xp, .xvs-mark { animation: none; } }
+
 </style>
 </head>
 <body>
 
 <div id="home" class="home" hidden></div>
+<div id="explore" class="xp" hidden role="region" aria-label="Explore"></div>
 
 <div class="wrap">
   <header class="top">
+    <nav class="modesw" aria-label="My stats or Explore"><button data-xmode="me" aria-current="page"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.6"/><path d="M2.8 14c.6-2.8 2.7-4.4 5.2-4.4s4.6 1.6 5.2 4.4"/></svg>My stats</button><button data-xmode="explore"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M10.6 5.4 9.2 9.2 5.4 10.6 6.8 6.8l3.8-1.4Z"/></svg>Explore</button></nav>
     <div class="top-row">
       <button class="whobtn" id="whoBtn" aria-label="Switch profile">
         <span class="mono av" id="hAvatar" hidden></span>
@@ -1679,7 +1877,7 @@ button:active { transform: scale(0.97); }
         (A.online.length
           ? '<div class="who-on">' + A.online.map((m) => '<span class="p">' + avatar(m) + esc(m.name) + '<span class="ago">' + esc(agoShort(A.lastEnd(m.tag))) + "</span></span>").join("") + "</div>"
           : (() => { const lastM = A.members.filter((m) => A.lastEnd(m.tag)).sort((a, b) => A.lastEnd(b.tag) - A.lastEnd(a.tag))[0];
-              return '<div class="sub">No one is in a battle right now.' + (lastM ? " Last active: " + esc(lastM.name) + ", " + esc(ago(A.lastEnd(lastM.tag))) + "." : "") + "</div>"; })()) +
+              return '<div class="sub">No recent battle activity detected in the last 12 minutes' + (D.lastTs ? " (checked " + esc(ago(D.lastTs)) + ")" : "") + "." + (lastM ? " Last active: " + esc(lastM.name) + ", " + esc(ago(A.lastEnd(lastM.tag))) + "." : "") + "</div>"; })()) +
         '<div class="sub mt">An estimate: Brawl Stars doesn\'t share who\'s online, so a member counts as recently active if one of their battles ended in the last 12 minutes. They may have stopped since, and someone who just started won\'t show until a battle ends. Battle logs are read every 4 to 15 minutes.</div>' +
       "</div>";
     const tiles =
@@ -1966,12 +2164,13 @@ button:active { transform: scale(0.97); }
         "<b>For each tracked player:</b> their public game stats (tag, name, trophies, brawlers, battles and club). Anyone using the app can see them, as in the game.",
         "<b>For this phone:</b> a random key made on this phone, your goals, your alert settings and the address your browser uses for notifications. Only this phone, and phones you link, can see or change them.",
         "To stop abuse, the server counts requests from each network address. The counts are scrambled and deleted within two days.",
+        "<b>Explore:</b> looking up a player or club keeps a public copy of their game data on the server for up to a day (so many lookups cost one call to the game), and counts lookups per hour with no identifiers. It doesn\'t track them or you. Favourites, recent lookups and \u201csince you last looked\u201d snapshots stay on this phone.",
         "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this phone."]) +
       sec("Keeping and removing", [
         "Each phone can start tracking 2 players (50 across the app). Removing a player you started frees your spot; if no other phone started them, they pause and their history is kept.",
         "Players nobody opens for 30 days stop being checked. Opening one again starts it back up when there\'s room.",
         "Turning notifications off deletes this phone\'s notification address for that player. Removing a goal deletes it.",
-        'To have a player\'s saved history deleted, contact the developer on <a href="' + REPO + '" target="_blank" rel="noopener">GitHub</a>.']) +
+        'Questions, corrections, or a player\'s saved history to delete: open an issue on <a href="' + REPO + '/issues" target="_blank" rel="noopener">GitHub Issues</a> (free GitHub account needed). Please don\'t post anything private there.']) +
       '<div class="tour-foot"><span class="tour-n">Unofficial fan app</span><div class="tour-btns"><button class="btn" data-about="close">Done</button></div></div></div>';
     aboutFrom = document.activeElement;
     document.documentElement.classList.add("homeopen");
@@ -2261,6 +2460,8 @@ button:active { transform: scale(0.97); }
             '<div id="hPreview" aria-live="polite"></div>' +
           "</div>" +
         "</section>" +
+        '<section class="home-sec" aria-label="Explore without tracking"><button class="xpromo" data-xmode="explore"><span class="fi"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M10.6 5.4 9.2 9.2 5.4 10.6 6.8 6.8l3.8-1.4Z"/></svg></span>' +
+          '<span><b>Just looking?</b><small>Explore any player or club without tracking: compare two players, scout a club, see recent battles.</small></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button></section>' +
         (first ? '<section class="home-sec feats" aria-label="What the app tracks">' +
           feat('<path d="M2 12.5l3.5-4 3 2.5L14 4"/><path d="M10.5 4H14v3.5"/>', "Trophy history", "Saved every 15 minutes, even while the app is closed.") +
           feat('<circle cx="5.5" cy="5.5" r="2.2"/><circle cx="11" cy="6.5" r="1.8"/><path d="M1.8 13.5c.5-2.3 2-3.6 3.7-3.6s3.2 1.3 3.7 3.6M9.6 10.3c1.6-.4 3.6.4 4.4 3.2"/>', "Club board and activity", "Who's climbing, who's been playing, and when the club plays.") +
@@ -2286,7 +2487,7 @@ button:active { transform: scale(0.97); }
         "</button>" +
         (H.edit ? '<button class="premove" data-remove="' + esc(p.tag) + '">Remove</button>' : "") +
       "</div>";
-    }).join("") + (H.edit ? '<div class="hint">Removing a player only takes it off this phone. Its stats keep being saved for anyone else following it.</div>' : "");
+    }).join("") + (H.edit ? '<div class="hint">Removing a player takes it off this phone. If this phone started tracking them and no other phone did, tracking pauses; their history is kept.</div>' : "");
     const e = $("#hEdit"); if (e) e.textContent = H.edit ? "Done" : "Edit";
   }
   // Update the saved cards (trophies, names, clubs) from the server.
@@ -2640,18 +2841,527 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   const h = (location.hash || "").slice(1); if (RENDER[h]) S.tab = h; else if (h === "battles") S.tab = "me";
   window.addEventListener("hashchange", () => { const t = (location.hash || "").slice(1); if (RENDER[t] && t !== S.tab) { S.tab = t; render(); window.scrollTo({ top: 0 }); } });
 
+  // ---------- Explore: any player or club, without tracking ----------
+  // A screen of its own over My stats. Looking someone up saves nothing on the server about them or this phone and
+  // doesn't use a tracking spot: the server fetches the public data, keeps it for everyone for a couple of minutes,
+  // and that's it. This phone remembers recent lookups, favourites and a small snapshot per player, so a return
+  // visit can say what changed ("since you last looked").
+  // Routes live in the address: #explore, #explore/p/TAG, #explore/vs/TAG/TAG, #explore/club/TAG.
+  const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {} };
+  const XI = {
+    vs: '<path d="M2.5 2.5l8 8M13.5 2.5l-8 8M3.5 9.5l3 3M12.5 9.5l-3 3M2 14l2.6-2.6M14 14l-2.6-2.6"/>',
+    club: '<path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.2-5.2 6.3-3-1.1-5.2-3.3-5.2-6.3V3.8L8 1.8Z"/><path d="M5.6 8.2l1.7 1.7 3.2-3.4"/>',
+    battles: '<path d="M2 13.5h12M4 11V7M7 11V4M10 11V8.5M13 11V5.5"/>',
+    search: '<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 14 14"/>',
+    star: '<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.8Z"/>',
+    track: '<path d="M2 12.5l3.5-4 3 2.5L14 4"/><path d="M10.5 4H14v3.5"/>',
+    back: '<path d="M10 3 5 8l5 5"/>',
+    swap: '<path d="M3 5h9.5l-2.5-2.5M13 11H3.5L6 13.5"/>',
+    explore: '<circle cx="8" cy="8" r="6.2"/><path d="M10.6 5.4 9.2 9.2 5.4 10.6 6.8 6.8l3.8-1.4Z"/>',
+    me: '<circle cx="8" cy="5.5" r="2.6"/><path d="M2.8 14c.6-2.8 2.7-4.4 5.2-4.4s4.6 1.6 5.2 4.4"/>',
+    arrow: '<path d="M6 3l5 5-5 5"/>',
+    card: '<rect x="3" y="1.8" width="10" height="12.4"/><path d="M5.5 10.5h5M5.5 12.5h3"/><circle cx="8" cy="6" r="2"/>',
+  };
+  const xsvg = (k) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + XI[k] + "</svg>";
+  const modeSwitch = (cur) => '<nav class="modesw" aria-label="My stats or Explore">' +
+    '<button data-xmode="me"' + (cur === "me" ? ' aria-current="page"' : "") + ">" + xsvg("me") + "My stats</button>" +
+    '<button data-xmode="explore"' + (cur === "explore" ? ' aria-current="page"' : "") + ">" + xsvg("explore") + "Explore</button></nav>";
+  const ART_BR = (id) => (id ? "https://cdn.brawlify.com/brawlers/borderless/" + id + ".png" : null);
+
+  // ----- routes -----
+  const xHash = (r) => "#explore" + (r.v === "player" ? "/p/" + r.tag : r.v === "club" ? "/club/" + r.tag : r.v === "vs" ? "/vs" + (r.a ? "/" + r.a + (r.b ? "/" + r.b : "") : "") : "");
+  function xParse(h) {
+    const p = String(h || "").replace(/^#/, "").split("/");
+    if (p[0] !== "explore") return null;
+    const t = (s) => { const v = normTag(decodeURIComponent(s || "")); return TAG_RE.test(v) ? v : ""; };
+    if (p[1] === "p" && t(p[2])) return { v: "player", tag: t(p[2]), focus: p[3] === "battles" };
+    if (p[1] === "club" && t(p[2])) return { v: "club", tag: t(p[2]) };
+    if (p[1] === "vs") return { v: "vs", a: t(p[2]), b: t(p[3]) };
+    return { v: "home" };
+  }
+  const xKey = (r) => xHash(r);
+  function xGo(r) {
+    const h = xHash(r);
+    if (X.open) X.scroll[xKey(X.route)] = $("#explore").scrollTop;
+    X.pendingFocus = r.focus ? "battles" : null;
+    if (location.hash === h) { xShow(r); return; }
+    X.pushed++;
+    location.hash = h; // the hashchange listener shows it, and the browser's back button works
+  }
+  function xBack() {
+    if (X.pushed > 0) { X.pushed--; history.back(); return; }
+    if (X.route.v !== "home") { try { history.replaceState(null, "", location.pathname + location.search + "#explore"); } catch (e) {} xShow({ v: "home" }); }
+  }
+  function xShow(r) {
+    const el = $("#explore");
+    if (!X.open) {
+      X.open = true;
+      el.innerHTML = '<div class="xp-sky" aria-hidden="true"></div><div class="xp-in"><header class="xp-top">' + modeSwitch("explore") + '<div class="xp-bar" id="xpBar"></div></header>' +
+        '<div id="xpBody" class="xp-body"></div>' +
+        '<p class="xp-foot"><span>Unofficial fan app. Not affiliated with or endorsed by Supercell.</span><span>Public game data from the official Brawl Stars API (through RoyaleAPI\'s proxy), with BrawlTime as a backup. Looking someone up doesn\'t track them. <button class="link" data-about="open">Privacy and data</button></span></p></div>';
+      el.hidden = false;
+      document.documentElement.classList.add("xpopen");
+    }
+    X.route = r;
+    // Coming back to a player or club after a while (or after an error) fetches it again.
+    for (const k of r.v === "player" ? ["p:" + r.tag] : r.v === "club" ? ["c:" + r.tag] : r.v === "vs" ? ["p:" + r.a, "p:" + r.b] : []) {
+      const st = X.state[k]; if (st && !st.busy && (st.err || Date.now() - st.at > 90e3)) delete X.state[k];
+    }
+    paintX();
+    const back = X.scroll[xKey(r)];
+    el.scrollTop = back || 0;
+    const h = $("#xpBody [data-xh]"); if (h) h.focus({ preventScroll: true });
+  }
+  function xClose() {
+    if (!X.open) return;
+    X.open = false;
+    $("#explore").hidden = true; $("#explore").innerHTML = "";
+    document.documentElement.classList.remove("xpopen");
+    if (xParse(location.hash)) { try { history.pushState(null, "", location.pathname + location.search); } catch (e) {} }
+    X.pushed = 0;
+    const b = H.open ? $("#home .home-h") : $("#whoBtn"); if (b) b.focus({ preventScroll: true });
+  }
+  window.addEventListener("hashchange", () => {
+    const r = xParse(location.hash);
+    if (r) xShow(r);
+    else if (X.open) { X.open = false; $("#explore").hidden = true; $("#explore").innerHTML = ""; document.documentElement.classList.remove("xpopen"); X.pushed = 0; }
+  });
+
+  // ----- data -----
+  async function xFetch(kind, tag, force) {
+    const key = kind + ":" + tag, c = X.cache.get(key);
+    if (!force && c && Date.now() - c.at < 90e3) return c.r;
+    const r = await callFn({ action: kind === "p" ? "explore_player" : "explore_club", tag });
+    X.cache.set(key, { at: Date.now(), r });
+    if (X.cache.size > 40) X.cache.delete(X.cache.keys().next().value);
+    return r;
+  }
+  function xErr(e, kind, tag) {
+    const code = e && e.code;
+    if (code === "player_not_found") return { t: "No player with the tag #" + tag, d: "Check the tag in Brawl Stars: tap the profile picture, the tag is under the name. Tags only use 0 2 8 9 P Y L Q G R J C U V." };
+    if (code === "club_not_found") return { t: "No club with the tag #" + tag, d: "Check the club's tag in Brawl Stars (on the club's page, under its name)." };
+    if (code === "slow_down") return { t: "Too many lookups from this network", d: "To keep the app free, each network can do about 60 lookups every 10 minutes. Wait a few minutes and try again." };
+    if (code === "upstream_unavailable") return { t: "Brawl Stars data isn't reachable right now", d: "The game's data service didn't answer, and there's no recent copy of this " + (kind === "c" ? "club" : "player") + ". Try again in a minute." };
+    if (!navigator.onLine) return { t: "You're offline", d: "Explore needs a connection. Your saved players still open in My stats." };
+    return { t: "Couldn't load that", d: String((e && e.message) || e).slice(0, 140) };
+  }
+  // Loads what the current route needs (once), then repaints.
+  function xNeed(kind, tag) {
+    const key = kind + ":" + tag, st = X.state[key];
+    if (st && (st.busy || st.r || st.err)) return st;
+    X.state[key] = { busy: true };
+    xFetch(kind, tag).then((r) => {
+      X.state[key] = { r, at: Date.now() };
+      if (kind === "p") { X.since[tag] = xSince(r.player); xRemember("p", r.player.tag, r.player.name, r.player.icon); }
+      else xRemember("c", r.club.tag, r.club.name, r.club.badge);
+    }).catch((e) => { X.state[key] = { err: xErr(e, kind, tag), at: Date.now() }; })
+      .then(() => { if (X.open) { paintX(); if (X.pendingFocus === "battles" && kind === "p") { X.pendingFocus = null; const s = $("#xBattles"); if (s) s.scrollIntoView({ block: "start" }); } } });
+    return X.state[key];
+  }
+  function xRetry(kind, tag) { delete X.state[kind + ":" + tag]; X.cache.delete(kind + ":" + tag); paintX(); }
+
+  // ----- what this phone remembers (no server involved) -----
+  const xRead = (k, d) => { try { const v = JSON.parse(lsGet(k) || "null"); return v == null ? d : v; } catch (e) { return d; } };
+  const xWrite = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  function xRemember(k, tag, name, pic) {
+    const list = xRead("xrecent", []).filter((x) => !(x.k === k && x.tag === tag));
+    list.unshift({ k, tag, name, pic, at: Date.now() });
+    xWrite("xrecent", list.slice(0, 10));
+    const fav = xRead("xfav", []), f = fav.find((x) => x.k === k && x.tag === tag);
+    if (f && (f.name !== name || f.pic !== pic)) { f.name = name; f.pic = pic; xWrite("xfav", fav); }
+  }
+  const isFav = (k, tag) => xRead("xfav", []).some((x) => x.k === k && x.tag === tag);
+  function toggleFav(k, tag, name, pic) {
+    let fav = xRead("xfav", []);
+    if (fav.some((x) => x.k === k && x.tag === tag)) fav = fav.filter((x) => !(x.k === k && x.tag === tag));
+    else fav.unshift({ k, tag, name, pic, at: Date.now() });
+    xWrite("xfav", fav.slice(0, 24));
+  }
+  // A small snapshot per player. The comparison is with the newest one from more than 30 minutes ago, so opening a
+  // player twice in a row doesn't wipe out what changed since the last real visit.
+  const xSnapOf = (p) => { const b = p.brawlers || []; return { at: Date.now(), t: p.trophies, hi: p.highest, w: (p.v3 || 0) + (p.solo || 0) + (p.duo || 0), n: b.length, p11: b.filter((x) => (x.power || 0) >= 11).length, br: Object.fromEntries(b.map((x) => [x.name, x.tr])) }; };
+  function xSince(p) {
+    const now = Date.now(), all = xRead("xsnap:" + p.tag, []);
+    const old = all.filter((s) => now - s.at > 30 * 60e3);
+    const prev = old.length ? old[old.length - 1] : null;
+    xWrite("xsnap:" + p.tag, old.slice(-3).concat([xSnapOf(p)]));
+    let idx = xRead("xsnaps", []).filter((t) => t !== p.tag); idx.unshift(p.tag);
+    for (const t of idx.slice(40)) { try { localStorage.removeItem("xsnap:" + t); } catch (e) {} }
+    xWrite("xsnaps", idx.slice(0, 40));
+    return { prev, cur: xSnapOf(p) };
+  }
+
+  // ----- battle maths (only what the game's battle log really says) -----
+  const typeName = (t) => (t === "ranked" ? "Trophy" : t === "soloRanked" || t === "teamRanked" ? "Ranked" : t === "friendly" ? "Friendly" : t ? title(String(t).replace(/([a-z])([A-Z])/g, "$1 $2")) : "Event");
+  const isSD = (b) => b.rank != null || /showdown/i.test(b.mode || "");
+  const xOut = (b) => (b.result === "victory" ? "w" : b.result === "defeat" ? "l" : b.result === "draw" ? "d" : null);
+  const spanText = (ms) => { const d = ms / DAY; if (d < 1 / 24) return "under an hour"; if (d < 1) return Math.max(1, Math.round(d * 24)) + " hours"; if (d < 45) return Math.round(d) + (Math.round(d) === 1 ? " day" : " days"); return Math.round(d / 30) + " months"; };
+  function xBattleStats(list) {
+    const team = list.filter((b) => xOut(b)), sd = list.filter((b) => b.rank != null);
+    const w = team.filter((b) => xOut(b) === "w").length, l = team.filter((b) => xOut(b) === "l").length, d = team.length - w - l;
+    let net = 0, tcn = 0; for (const b of list) if (b.tc != null) { net += b.tc; tcn++; }
+    let streak = 0, sk = null; for (const b of list) { const o = xOut(b); if (!o) continue; if (o === "d") break; if (sk == null) sk = o; if (o !== sk) break; streak++; }
+    const avgRank = sd.length ? sd.reduce((a, b) => a + b.rank, 0) / sd.length : null;
+    return { n: list.length, team: team.length, w, l, d, rate: w + l ? w / (w + l) : null, sd: sd.length, avgRank, best: sd.length ? Math.min(...sd.map((b) => b.rank)) : null,
+      net, tcn, stars: list.filter((b) => b.star).length, streak, sk, newest: list.length ? list[0].t : null, oldest: list.length ? list[list.length - 1].t : null };
+  }
+  const groupBy = (list, key) => { const m = new Map(); for (const b of list) { const k = key(b); if (!k) continue; if (!m.has(k)) m.set(k, []); m.get(k).push(b); } return [...m].sort((a, b) => b[1].length - a[1].length); };
+  const recLine = (st) => [st.team ? st.w + "W " + st.l + "L" + (st.d ? " " + st.d + "D" : "") : "", st.sd ? "avg #" + st.avgRank.toFixed(1) : ""].filter(Boolean).join(" · ");
+
+  // ----- painting -----
+  function paintX() {
+    const r = X.route, bar = $("#xpBar"), body = $("#xpBody");
+    if (!bar || !body) return;
+    const crumb = { home: "", player: "Player", vs: "Head-to-head", club: "Club scout" }[r.v];
+    bar.innerHTML = r.v === "home" ? "" : '<button class="xp-back" data-xback aria-label="Back">' + xsvg("back") + '</button><span class="xp-crumb">' + crumb + "</span>";
+    bar.hidden = r.v === "home";
+    body.innerHTML = r.v === "player" ? xPlayer(r.tag) : r.v === "club" ? xClub(r.tag) : r.v === "vs" ? xVs(r) : xHome();
+  }
+  const xLoading = (label) => '<div class="xskel" role="status" aria-label="' + esc(label) + '"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div></div>';
+  const xErrBox = (e, kind, tag) => '<div class="xerr" role="alert"><b>' + esc(e.t) + "</b><p>" + esc(e.d) + '</p><button class="btn ghost" data-xretry="' + kind + ":" + esc(tag) + '">Try again</button></div>';
+  const xFresh = (r, what) => {
+    const at = Date.parse(r.fetched_at), src = (r.player || r.club || {}).src === "brawltime" ? "BrawlTime" : "the official Brawl Stars API";
+    return '<div class="xfresh' + (r.source === "stale" ? " stale" : "") + '"><i></i><span>' + (r.source === "stale"
+      ? "Brawl Stars data isn't reachable right now, so this is a saved copy from " + esc(ago(at)) + "."
+      : "Fetched " + esc(ago(at)) + " from " + src + ". " + what) + "</span></div>";
+  };
+
+  function xHome() {
+    const fav = xRead("xfav", []), recent = xRead("xrecent", []), mine = PROFILES.list();
+    const chip = (x) => '<button class="xchip" data-xgo="' + (x.k === "c" ? "club" : "p") + ":" + esc(x.tag) + '"><span class="mono">' +
+      art(x.k === "c" ? ART.badge(x.pic) : ART.icon(x.pic)) + esc(initials(x.name || x.tag)) + '</span><span class="t">' + esc(x.name || "#" + x.tag) + "</span>" +
+      (x.k === "c" ? "<small>club</small>" : "") + "</button>";
+    const tile = (go, icon, t, sub, teal) => '<button class="xtile' + (teal ? " t" : "") + '" data-xgo="' + go + '"><span class="fi">' + xsvg(icon) + "</span><b>" + t + "</b><small>" + sub + "</small></button>";
+    const kindSeg = '<div class="seg" role="group" aria-label="Look up">' + [["p", "Player"], ["c", "Club"]].map(([v, l]) => '<button type="button" data-xkind="' + v + '" aria-pressed="' + (X.kind === v) + '">' + l + "</button>").join("") + "</div>";
+    const left = '<div>' +
+      '<h1 class="xp-h" tabindex="-1" data-xh>Explore<span>.</span></h1>' +
+      '<p class="xp-lede">Look up any player or club, compare two players, and see their recent battles. Nothing is tracked, and it doesn\'t use a tracking spot.</p>' +
+      '<form class="xp-search" id="xSearch" novalidate>' +
+        '<div class="ctrls" style="margin:0">' + kindSeg + '<span class="k-label">No sign-up</span></div>' +
+        '<div class="row2"><label class="tagfield" for="xQ"><span class="hash" aria-hidden="true">#</span><input id="xQ" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="' + (X.kind === "c" ? "Club tag" : "Player tag") + '" aria-label="' + (X.kind === "c" ? "Club tag" : "Player tag") + '" aria-describedby="xQHint" value="' + esc(X.q || "") + '"></label>' +
+        '<button class="btn xp-go" type="submit">Go</button></div>' +
+        '<div class="hint" id="xQHint">' + (X.qErr ? '<span style="color:var(--bad)">' + esc(X.qErr) + "</span>" : X.kind === "c" ? "On the club's page in Brawl Stars, the tag is under its name." : "In Brawl Stars, tap a profile picture. The tag is under the name.") + "</div>" +
+      "</form>" +
+      '<div class="xp-tiles">' +
+        tile("vs", "vs", "Head-to-head", "Two players side by side") +
+        tile("search:c", "club", "Club scout", "Any club's roster and spread", true) +
+        tile("search:battles", "battles", "Battle breakdown", "Recent battles, modes and brawlers") +
+        tile("search:p", "search", "Player lookup", "Profile, brawlers, what changed", true) +
+      "</div></div>";
+    const right = '<div>' +
+      (mine.length ? '<div class="xsec-h"><h2>Your players</h2></div><div class="xchips">' + mine.map((p) => chip({ k: "p", tag: p.tag, name: p.name, pic: p.icon })).join("") + "</div>" : "") +
+      (fav.length ? '<div class="xsec-h"><h2>Favourites</h2></div><div class="xchips">' + fav.map(chip).join("") + "</div>" : "") +
+      (recent.length ? '<div class="xsec-h"><h2>Recent</h2><button class="link" data-xclear>Clear</button></div><div class="xchips">' + recent.map(chip).join("") + "</div>" : "") +
+      (!fav.length && !recent.length ? '<div class="card"><h2>Tip</h2><div class="sub">Star a player or club to keep them here. Next time you open them, you\'ll see what changed since you last looked. That stays on this phone.</div></div>' : "") +
+      '<div class="xsoon">' + xsvg("card") + "<span><b>Coming next: share cards.</b> Turn a player, a head-to-head or a battle recap into an image to send to friends.</span></div>" +
+      "</div>";
+    return '<div class="xhome">' + left + right + "</div>";
+  }
+
+  function xPlayer(tag) {
+    const st = xNeed("p", tag);
+    if (st.busy) return xLoading("Loading #" + tag);
+    if (st.err) return xErrBox(st.err, "p", tag);
+    const r = st.r, p = r.player, b = p.brawlers || [], saved = PROFILES.list().some((x) => x.tag === p.tag);
+    const fav = isFav("p", p.tag), p11 = b.filter((x) => (x.power || 0) >= 11).length;
+    const trackBtn = saved ? '<button class="xact go" data-xopen="' + esc(p.tag) + '">' + xsvg("arrow") + "My stats</button>"
+      : '<button class="xact go" data-xtrack="' + esc(p.tag) + '">' + xsvg("track") + (r.tracked && r.active !== false ? "Add" : "Track") + "</button>";
+    const hero = '<div class="card cut">' +
+      '<div class="xhero"><span class="mono av">' + art(ART.icon(p.icon)) + esc(initials(p.name)) + "</span>" +
+        '<div style="min-width:0"><h1 tabindex="-1" data-xh>' + esc(p.name) + '</h1><div class="tg">#' + esc(p.tag) + (p.exp ? " · Level " + fmt(p.exp) : "") + (p.prestige ? " · Prestige " + fmt(p.prestige) : "") + "</div>" +
+        (p.club ? '<button class="xclub" data-xgo="club:' + esc(p.club.tag) + '"><b>' + esc(p.club.name || "#" + p.club.tag) + "</b></button>" : '<div class="tg" style="margin-top:4px">Not in a club</div>') + "</div></div>" +
+      '<div class="xhero-num"><span class="hero-num">' + fmt(p.trophies) + '</span><span class="pk">Peak ' + fmt(p.highest) + "</span></div>" +
+      '<div class="xacts"><button class="xact" data-xfav="p:' + esc(p.tag) + '" aria-pressed="' + fav + '" aria-label="' + (fav ? "Remove from favourites" : "Add to favourites") + '">' + xsvg("star") + (fav ? "Saved" : "Favourite") + "</button>" +
+        '<button class="xact" data-xgo="vs:' + esc(p.tag) + '">' + xsvg("vs") + "Compare</button>" + trackBtn + "</div>" +
+      (X.msg[p.tag] ? '<div class="xmsg' + (X.msg[p.tag].bad ? " bad" : "") + '" role="status">' + esc(X.msg[p.tag].t) + "</div>" : "") +
+      xFresh(r, "Not tracked: nothing about " + esc(p.name) + " is saved.") +
+    "</div>";
+    const stats = '<div class="card"><h2>Profile</h2><div class="xstat3">' +
+        '<div><span class="k">3v3 wins</span><span class="v">' + fmt(p.v3) + '</span></div><div><span class="k">Solo wins</span><span class="v">' + fmt(p.solo) + '</span></div><div><span class="k">Duo wins</span><span class="v">' + fmt(p.duo) + "</span></div></div>" +
+      '<div class="xstat3" style="margin-bottom:0"><div><span class="k">Brawlers</span><span class="v">' + b.length + '</span><span class="n">unlocked</span></div><div><span class="k">Power 11</span><span class="v">' + p11 + '</span><span class="n">of ' + b.length + '</span></div><div><span class="k">Gear</span><span class="v">' + fmt(b.reduce((a, x) => a + (x.g || 0) + (x.sp || 0) + (x.gear || 0), 0)) + '</span><span class="n">gadgets, SPs, gears</span></div></div></div>';
+    const left = '<div>' + hero + xSinceCard(p) + stats + xTopBrawlers(p) + (saved ? "" : xTrackCard(p, r)) + "</div>";
+    const right = '<div>' + xBattlesCard(p) + "</div>";
+    return '<div class="xcols">' + left + right + "</div>";
+  }
+  function xSinceCard(p) {
+    const s = X.since[p.tag];
+    if (!s) return "";
+    if (!s.prev) return '<div class="card xsince"><h2>Since you last looked</h2><div class="sub">First look at ' + esc(p.name) + " on this phone. Come back later to see what changed. " + (isFav("p", p.tag) ? "" : "Star them to keep them handy.") + "</div></div>";
+    const a = s.prev, c = s.cur, items = [];
+    const add = (label, d, unit) => { if (d) items.push("<li><span>" + label + '</span><b class="' + tcls(d) + '">' + sgn(d) + (unit || "") + "</b></li>"); };
+    add("Trophies", (c.t || 0) - (a.t || 0));
+    add("Peak trophies", (c.hi || 0) - (a.hi || 0));
+    add("Wins (3v3, solo, duo)", c.w - a.w);
+    add("Brawlers unlocked", c.n - a.n);
+    add("Brawlers at power 11", c.p11 - a.p11);
+    const gains = Object.keys(c.br).filter((k) => a.br && a.br[k] != null && c.br[k] !== a.br[k]).map((k) => [k, c.br[k] - a.br[k]]).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 3);
+    for (const [k, d] of gains) add(esc(title(k)), d);
+    return '<div class="card xsince"><h2>Since you last looked<span class="sp"></span><span class="aside">' + esc(ago(a.at)) + "</span></h2>" +
+      (items.length ? "<ul>" + items.join("") + "</ul>" : '<div class="sub">No change since ' + esc(dtShort(a.at)) + ".</div>") +
+      '<div class="xnote">Compared with what this phone saw on ' + esc(dtShort(a.at)) + ". Kept on this phone only.</div></div>";
+  }
+  function xTopBrawlers(p) {
+    const b = (p.brawlers || []).slice().sort((x, y) => (y.tr || 0) - (x.tr || 0));
+    if (!b.length) return "";
+    const max = b[0].tr || 1, k = "br:" + p.tag, n = X.more[k] ? b.length : 8;
+    return '<div class="card"><h2>Brawlers by trophies<span class="sp"></span><span class="aside">' + b.length + "</span></h2>" +
+      b.slice(0, n).map((x) => '<div class="xbar"><div class="nm"><span class="mono' + ((x.power || 0) >= 11 ? " p11" : "") + '">' + art(ART_BR(x.id)) + esc(initials(title(x.name))) + (x.power ? '<span class="pow">' + x.power + "</span>" : "") + "</span><span>" + esc(title(x.name)) + '</span></div><div class="end">' + fmt(x.tr) + " · peak " + fmt(x.hi) + '</div><div class="meter hot"><i style="width:' + Math.max(2, Math.round(((x.tr || 0) / max) * 100)) + '%"></i></div></div>').join("") +
+      (b.length > 8 ? '<button class="xmore" data-xmore="' + esc(k) + '">' + (X.more[k] ? "Show top 8" : "Show all " + b.length) + "</button>" : "") + "</div>";
+  }
+  function xTrackCard(p, r) {
+    const paused = r.tracked && r.active === false;
+    return '<div class="card xtrack"><h2>Want history?</h2><p>' + (r.tracked && !paused
+      ? esc(p.name) + " is already tracked in the app, so adding them to My stats is free: trophy history every 15 minutes, club activity, goals and alerts."
+      : "Explore shows what the game shares right now. Tracking " + esc(p.name) + " saves their stats every 15 minutes for charts, club activity, goals and alerts. Each phone can start tracking 2 players.") +
+      '</p><button class="btn" data-xtrack="' + esc(p.tag) + '">' + (r.tracked && !paused ? "Add to My stats" : "Track " + esc(p.name)) + "</button></div>";
+  }
+  function xBattlesCard(p) {
+    const head = '<h2 id="xBattles" tabindex="-1">Battle breakdown</h2>';
+    if (p.battles == null) return '<div class="card">' + head + '<div class="sub">The game\'s battle log couldn\'t be read just now. Try again in a minute.</div></div>';
+    if (!p.battles.length) return '<div class="card">' + head + '<div class="sub">The game lists no recent battles for ' + esc(p.name) + ".</div></div>";
+    const filt = X.filt, all = p.battles;
+    const list = all.filter((b) => filt === "all" || (filt === "sd" ? isSD(b) : !isSD(b)));
+    const st = xBattleStats(list);
+    const segH = '<div class="seg" role="group" aria-label="Which battles">' + [["all", "All " + all.length], ["team", "Team"], ["sd", "Showdown"]].map(([v, l]) => '<button data-xfilt="' + v + '" aria-pressed="' + (filt === v) + '">' + l + "</button>").join("") + "</div>";
+    const span = all.length ? all[0].t - all[all.length - 1].t : 0;
+    const intro = '<div class="sub" style="margin-bottom:10px">The game shares each player\'s last ' + (all.length === 25 ? "25 battles" : all.length + (all.length === 1 ? " battle" : " battles") + " (it lists up to 25)") +
+      ". These cover " + spanText(span) + ", the latest " + esc(ago(all[0].t)) + ".</div>";
+    if (!list.length) return '<div class="card">' + head + intro + '<div class="ctrls">' + segH + '</div><div class="sub">No ' + (filt === "sd" ? "Showdown" : "team") + " battles among these.</div></div>";
+    const tiles = '<div class="xstat3">' +
+      '<div><span class="k">Win rate</span><span class="v ' + (st.rate == null ? "" : st.rate >= 0.5 ? "up" : "down") + '">' + (st.rate == null ? "—" : pct100(st.rate) + "%") + '</span><span class="n">' + (st.team ? st.w + "W " + st.l + "L" + (st.d ? " " + st.d + "D" : "") : "no team games") + "</span></div>" +
+      '<div><span class="k">Showdown</span><span class="v">' + (st.sd ? "#" + st.avgRank.toFixed(1) : "—") + '</span><span class="n">' + (st.sd ? "avg of " + st.sd + " · best #" + st.best : "none") + "</span></div>" +
+      '<div><span class="k">Trophies</span><span class="v ' + cls(st.net) + '">' + (st.tcn ? sgn(st.net) : "—") + '</span><span class="n">' + (st.tcn ? st.tcn + " games" : "not shared") + "</span></div></div>";
+    const wl = st.team ? '<div class="wl" role="img" aria-label="' + st.w + " wins, " + st.l + " losses, " + st.d + ' draws">' + (st.w ? '<i class="w" style="flex:' + st.w + '"></i>' : "") + (st.l ? '<i class="l" style="flex:' + st.l + '"></i>' : "") + (st.d ? '<i class="d" style="flex:' + st.d + '"></i>' : "") + "</div>" : "";
+    const facts = [st.streak > 1 ? st.streak + (st.sk === "w" ? " wins" : " losses") + " in a row (team games)" : "", st.stars ? "Star player " + st.stars + (st.stars === 1 ? " time" : " times") : ""].filter(Boolean);
+    const modes = groupBy(list, (b) => b.mode), brs = groupBy(list, (b) => b.br && b.br.name);
+    const gRow = (icon, name, arr, max) => { const s = xBattleStats(arr); return '<div class="xbar"><div class="nm"><span class="mono">' + icon + esc(initials(name)) + "</span><span>" + esc(name) + '</span></div><div class="end">' + arr.length + (recLine(s) ? " · " + esc(recLine(s)) : "") + (s.tcn ? " · " + sgn(s.net) : "") + '</div><div class="meter teal"><i style="width:' + Math.round((arr.length / max) * 100) + '%"></i></div></div>'; };
+    const lk = "log:" + p.tag, shown = X.more[lk] ? list : list.slice(0, 8);
+    const logRow = (b) => {
+      const o = xOut(b), res = b.rank != null ? "#" + b.rank : o === "w" ? "WIN" : o === "l" ? "LOSS" : o === "d" ? "DRAW" : "—";
+      const rc = b.rank === 1 ? "first" : b.rank != null ? (b.tc > 0 ? "w" : b.tc < 0 ? "l" : "d") : o || "d";
+      const nm = b.br && b.br.name ? title(b.br.name) : modeName(b.mode);
+      return '<div class="xlog"><span class="res ' + rc + '">' + res + '</span><span class="mono">' + art(b.br ? ART_BR(b.br.id) : ART.mode(b.mode)) + esc(initials(nm)) + "</span>" +
+        '<div style="min-width:0"><div class="nm">' + esc(nm) + (b.star ? '<span class="star" title="Star player">★</span>' : "") + '</div><div class="ds">' + esc(modeName(b.mode)) + (b.map ? " · " + esc(b.map) : "") + " · " + esc(typeName(b.type)) + " · " + esc(agoShort(b.t)) + "</div></div>" +
+        '<span class="tc ' + tcls(b.tc) + '">' + (b.tc == null ? "" : sgn(b.tc)) + "</span></div>";
+    };
+    return '<div class="card">' + head + intro + '<div class="ctrls">' + segH + "</div>" + tiles + wl +
+      (facts.length ? '<div class="sub">' + esc(facts.join(" · ")) + "</div>" : "") +
+      '<div class="xnote">Win rate counts team games the game marks as a win, loss or draw. Showdown is shown as placement instead. Only these ' + list.length + " battles count, not lifetime stats.</div>" +
+      '<div class="sec-label" style="margin-top:16px">Modes</div>' + modes.slice(0, 6).map(([m, arr]) => gRow(art(ART.mode(m)), modeName(m), arr, modes[0][1].length)).join("") +
+      '<div class="sec-label" style="margin-top:16px">Brawlers played</div>' + brs.slice(0, 6).map(([n, arr]) => gRow(art(ART_BR(arr[0].br.id)), title(n), arr, brs[0][1].length)).join("") +
+      '<div class="sec-label" style="margin-top:16px">Match by match</div><div>' + shown.map(logRow).join("") + "</div>" +
+      (list.length > 8 ? '<button class="xmore" data-xmore="' + esc(lk) + '">' + (X.more[lk] ? "Show fewer" : "Show all " + list.length) + "</button>" : "") +
+    "</div>";
+  }
+
+  function xClub(tag) {
+    const st = xNeed("c", tag);
+    if (st.busy) return xLoading("Loading club #" + tag);
+    if (st.err) return xErrBox(st.err, "c", tag);
+    const r = st.r, c = r.club, m = c.members || [], fav = isFav("c", c.tag);
+    const tr = m.map((x) => x[3] || 0).sort((a, b) => a - b), total = tr.reduce((a, b) => a + b, 0);
+    const med = tr.length ? (tr.length % 2 ? tr[(tr.length - 1) / 2] : (tr[tr.length / 2 - 1] + tr[tr.length / 2]) / 2) : null;
+    const typeL = c.type === "open" ? "Open" : c.type === "inviteOnly" ? "Invite only" : c.type === "closed" ? "Closed" : c.type ? title(c.type) : "—";
+    const hero = '<div class="card cut"><div class="xclubh"><span class="badgebox">' + art(ART.badge(c.badge)) + esc(initials(c.name)) + "</span>" +
+        '<div style="min-width:0"><h1 tabindex="-1" data-xh style="margin:0;font-size:26px;line-height:1.1;overflow-wrap:anywhere">' + esc(c.name) + '</h1><div class="tg" style="font-family:var(--font-num);font-size:12.5px;color:var(--muted)">#' + esc(c.tag) + " · " + esc(typeL) + (c.req ? " · needs " + fmt(c.req) : "") + "</div></div></div>" +
+      '<div class="xhero-num"><span class="hero-num teal">' + fmt(c.trophies) + '</span><span class="pk">' + m.length + " / 30 members</span></div>" +
+      (c.desc ? '<p class="xdesc">' + esc(c.desc) + "</p>" : "") +
+      '<div class="xacts" style="grid-template-columns:1fr 1fr"><button class="xact" data-xfav="c:' + esc(c.tag) + '" aria-pressed="' + fav + '" aria-label="' + (fav ? "Remove from favourites" : "Add to favourites") + '">' + xsvg("star") + (fav ? "Saved" : "Favourite") + "</button>" +
+        (r.tracked_via ? '<button class="xact go" data-xopenclub="' + esc(r.tracked_via) + '">' + xsvg("arrow") + "History</button>" : '<button class="xact" data-xgo="vs">' + xsvg("vs") + "Compare players</button>") + "</div>" +
+      xFresh(r, "Member list as the game shares it, which can trail by up to an hour.") + "</div>";
+    const tiles = '<div class="card"><h2>Member trophies</h2><div class="xstat3" style="margin-bottom:12px">' +
+      '<div><span class="k">Average</span><span class="v">' + (m.length ? fmt(total / m.length) : "—") + "</span></div>" +
+      '<div><span class="k">Median</span><span class="v">' + fmt(med) + "</span></div>" +
+      '<div><span class="k">Range</span><span class="v" style="font-size:15px">' + (m.length ? fmt(tr[0]) + "–" + fmt(tr[tr.length - 1]) : "—") + "</span></div></div>" + xHist(tr) + "</div>";
+    const roles = ["president", "vicePresident", "senior", "member"].map((k) => [k, m.filter((x) => x[2] === k).length]).filter((x) => x[1]);
+    const top = m.slice().sort((a, b) => (b[3] || 0) - (a[3] || 0));
+    const contrib = '<div class="card"><h2>Biggest share of the total</h2>' + top.slice(0, 5).map((x) => '<div class="xbar"><div class="nm"><span class="mono">' + art(ART.icon(x[4])) + esc(initials(x[1])) + "</span><span>" + esc(x[1]) + '</span></div><div class="end">' + (total ? (((x[3] || 0) / total) * 100).toFixed(1) + "%" : "—") + " · " + fmt(x[3]) + '</div><div class="meter hot"><i style="width:' + (total ? Math.round(((x[3] || 0) / (top[0][3] || 1)) * 100) : 0) + '%"></i></div></div>').join("") +
+      '<div class="xnote">Roles: ' + roles.map(([k, n]) => n + " " + (roleName[k] || k).toLowerCase() + (n === 1 ? "" : "s")).join(", ") + ".</div></div>";
+    const sorted = X.sort === "role" ? m.slice().sort((a, b) => ["president", "vicePresident", "senior", "member"].indexOf(a[2]) - ["president", "vicePresident", "senior", "member"].indexOf(b[2]) || (b[3] || 0) - (a[3] || 0))
+      : X.sort === "name" ? m.slice().sort((a, b) => String(a[1]).localeCompare(String(b[1]))) : top;
+    const roster = '<div class="card"><h2>Roster<span class="sp"></span><span class="aside">' + m.length + "</span></h2>" +
+      '<div class="ctrls"><div class="seg" role="group" aria-label="Sort members">' + [["trophies", "Trophies"], ["role", "Role"], ["name", "Name"]].map(([v, l]) => '<button data-xsort="' + v + '" aria-pressed="' + (X.sort === v) + '">' + l + "</button>").join("") + "</div></div>" +
+      "<div>" + sorted.map((x) => '<button class="xmem" data-xgo="p:' + esc(x[0]) + '" aria-label="' + esc(x[1]) + ", " + esc(roleName[x[2]] || "member") + ", " + fmt(x[3]) + ' trophies. Open profile"><span class="rank">' + (top.indexOf(x) + 1) + '</span><span class="mono">' + art(ART.icon(x[4])) + esc(initials(x[1])) + "</span>" +
+        '<span style="min-width:0"><span class="nm">' + esc(x[1]) + "</span>" + (x[2] && x[2] !== "member" ? '<span class="role ' + esc(x[2]) + '">' + esc(roleShort[x[2]] || x[2]) + "</span>" : "") + '</span><span class="end"><b>' + fmt(x[3]) + "</b><small>" + (total ? (((x[3] || 0) / total) * 100).toFixed(1) + "%" : "") + "</small></span></button>").join("") + "</div></div>";
+    const act = r.tracked_via
+      ? '<div class="card xtrack"><h2>Club history</h2><p>A member of this club is tracked in the app, so its trophy history and who\'s been playing are saved.</p><button class="btn" data-xopenclub="' + esc(r.tracked_via) + '">Open club history</button></div>'
+      : '<div class="card"><h2>Activity</h2><div class="sub">Who\'s been playing and how the club grows over time need tracking. Track a member of this club to start saving its history.</div></div>';
+    return '<div class="xcols"><div>' + hero + tiles + contrib + act + "</div><div>" + roster + "</div></div>";
+  }
+  function xHist(tr) {
+    if (tr.length < 2) return "";
+    const lo = tr[0], hi = tr[tr.length - 1], n = 5, w = Math.max(1, Math.ceil((hi - lo + 1) / n));
+    const b = new Array(n).fill(0); for (const v of tr) b[Math.min(n - 1, Math.floor((v - lo) / w))]++;
+    const max = Math.max(...b);
+    return '<div class="xhist" role="img" aria-label="How many members are in each trophy range">' + b.map((k, i) => '<div class="hr"><span>' + fmt(lo + i * w) + "–" + fmt(Math.min(hi, lo + (i + 1) * w - 1)) + '</span><span class="meter teal"><i style="width:' + (max ? Math.round((k / max) * 100) : 0) + '%"></i></span><span>' + k + "</span></div>").reverse().join("") + "</div>";
+  }
+
+  function xVs(r) {
+    const recent = xRead("xrecent", []).filter((x) => x.k === "p").concat(PROFILES.list().map((p) => ({ k: "p", tag: p.tag, name: p.name, pic: p.icon })));
+    const seen = new Set(), pick = recent.filter((x) => !seen.has(x.tag) && seen.add(x.tag)).slice(0, 8);
+    const field = (id, v, lab) => '<div style="min-width:0"><label class="k-label" for="' + id + '">' + lab + '</label><label class="tagfield sm" for="' + id + '" style="margin-top:0"><span class="hash" aria-hidden="true">#</span><input id="' + id + '" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="Tag" value="' + esc(v || "") + '"></label></div>';
+    const form = '<form class="card" id="xVs" novalidate><h2 tabindex="-1" data-xh>Head-to-head</h2><div class="xvs-form">' + field("xA", r.a, "Player 1") +
+        '<button type="button" class="xswap" data-xswap aria-label="Swap the two players">' + xsvg("swap") + "</button>" + field("xB", r.b, "Player 2") + "</div>" +
+      (pick.length ? '<div class="xchips" style="margin-top:12px" aria-label="Recent players">' + pick.map((x) => '<button type="button" class="xchip" data-xfill="' + esc(x.tag) + '"><span class="mono">' + art(ART.icon(x.pic)) + esc(initials(x.name || x.tag)) + '</span><span class="t">' + esc(x.name || "#" + x.tag) + "</span></button>").join("") + "</div>" : "") +
+      (X.vsErr ? '<div class="pv-err" role="alert">' + esc(X.vsErr) + "</div>" : "") +
+      '<button class="btn wide" type="submit" style="margin-top:14px">Compare</button></form>';
+    if (!r.a || !r.b) return form + '<div class="xnote">Pick two players. Their public profiles and recent battles are compared side by side. Nobody is tracked.</div>';
+    const A = xNeed("p", r.a), B = xNeed("p", r.b);
+    if (A.busy || B.busy) return form + xLoading("Comparing");
+    if (A.err) return form + xErrBox(A.err, "p", r.a);
+    if (B.err) return form + xErrBox(B.err, "p", r.b);
+    const a = A.r.player, b = B.r.player;
+    const who = (p, side) => '<button class="xvs-p ' + side + '" data-xgo="p:' + esc(p.tag) + '"><span class="mono av">' + art(ART.icon(p.icon)) + esc(initials(p.name)) + "</span><b>" + esc(p.name) + "</b><small>#" + esc(p.tag) + '</small><span class="t">' + TROPHY + fmt(p.trophies) + "</span></button>";
+    const head = '<div class="card cut"><div class="xvs-head">' + who(a, "a") + '<span class="xvs-mark" aria-hidden="true">VS</span>' + who(b, "b") + "</div></div>";
+    const cat = X.cat;
+    const segH = '<div class="seg fill" role="group" aria-label="What to compare">' + [["overview", "Overview"], ["brawlers", "Brawlers"], ["recent", "Recent"], ["records", "Records"]].map(([v, l]) => '<button data-xcat="' + v + '" aria-pressed="' + (cat === v) + '">' + l + "</button>").join("") + "</div>";
+    const row = (label, va, vb, opts) => {
+      opts = opts || {};
+      const na = va == null ? null : +va, nb = vb == null ? null : +vb;
+      const lead = na == null || nb == null || na === nb ? 0 : (opts.low ? na < nb : na > nb) ? 1 : 2;
+      const sh = (v) => (v == null ? "—" : opts.f ? opts.f(v) : fmt(v));
+      const mx = Math.max(Math.abs(na || 0), Math.abs(nb || 0)) || 1;
+      const bar = opts.nobar || na == null || nb == null ? "" : '<div class="dual" aria-hidden="true"><i><b style="width:' + Math.round((Math.abs(na) / mx) * 100) + '%"></b></i><i><b style="width:' + Math.round((Math.abs(nb) / mx) * 100) + '%"></b></i></div>';
+      const tie = na != null && nb != null && na === nb;
+      return '<div class="xrow" role="row"><span class="va' + (lead === 1 ? " lead" : "") + '" role="cell">' + sh(va) + '</span><span class="lab" role="rowheader">' + label + '</span><span class="vb' + (lead === 2 ? " lead" : "") + '" role="cell">' + sh(vb) + "</span>" + bar +
+        (opts.sub ? '<span class="sub2">' + opts.sub + "</span>" : tie ? '<span class="sub2">Tie</span>' : "") + "</div>";
+    };
+    const table = (rows) => '<div class="xcmp" role="table" aria-label="' + esc(a.name) + " versus " + esc(b.name) + '"><div class="xrow" role="row" style="padding-top:0"><span class="va k-label" role="columnheader">' + esc(a.name) + '</span><span class="lab" role="columnheader"></span><span class="vb k-label" role="columnheader">' + esc(b.name) + "</span></div>" + rows.join("") + "</div>";
+    const bA = a.brawlers || [], bB = b.brawlers || [];
+    let body = "";
+    if (cat === "overview") {
+      body = table([row("Trophies", a.trophies, b.trophies), row("Peak trophies", a.highest, b.highest), row("Level", a.exp, b.exp), row("3v3 wins", a.v3, b.v3), row("Solo wins", a.solo, b.solo), row("Duo wins", a.duo, b.duo)]) +
+        '<div class="xnote">Each line stands on its own. There\'s no overall winner, because these don\'t add up to one score.</div>';
+    } else if (cat === "brawlers") {
+      const sum = (l, f) => l.reduce((s, x) => s + (f(x) || 0), 0);
+      const shared = bA.filter((x) => bB.some((y) => y.name === x.name)).map((x) => [x, bB.find((y) => y.name === x.name)]).sort((p, q) => (q[0].tr + q[1].tr) - (p[0].tr + p[1].tr));
+      body = table([row("Unlocked", bA.length, bB.length), row("Power 11", bA.filter((x) => x.power >= 11).length, bB.filter((x) => x.power >= 11).length), row("Gadgets", sum(bA, (x) => x.g), sum(bB, (x) => x.g)),
+        row("Star powers", sum(bA, (x) => x.sp), sum(bB, (x) => x.sp)), row("Gears", sum(bA, (x) => x.gear), sum(bB, (x) => x.gear)), row("Avg trophies", bA.length ? sum(bA, (x) => x.tr) / bA.length : null, bB.length ? sum(bB, (x) => x.tr) / bB.length : null)]) +
+        (shared.length ? '<div class="sec-label" style="margin-top:16px">Both play: top ' + Math.min(8, shared.length) + "</div>" + table(shared.slice(0, 8).map(([x, y]) => row(esc(title(x.name)), x.tr, y.tr, { sub: "power " + (x.power || "—") + " vs " + (y.power || "—") }))) : "");
+    } else if (cat === "recent") {
+      const la = a.battles || [], lb = b.battles || [], sa = xBattleStats(la), sb2 = xBattleStats(lb);
+      const spanA = la.length ? la[0].t - la[la.length - 1].t : 0, spanB = lb.length ? lb[0].t - lb[lb.length - 1].t : 0;
+      const differ = la.length && lb.length && (Math.max(spanA, spanB) > 3 * Math.max(Math.min(spanA, spanB), HOUR));
+      if (a.battles == null || b.battles == null) body = '<div class="sub">One of the battle logs couldn\'t be read just now. Try again in a minute.</div>';
+      else body = table([
+          row("Battles listed", la.length, lb.length, { nobar: true, sub: "over " + spanText(spanA) + " vs " + spanText(spanB) }),
+          row("Team win rate", sa.rate == null ? null : sa.rate * 100, sb2.rate == null ? null : sb2.rate * 100, { f: (v) => Math.round(v) + "%", sub: (sa.team || 0) + " vs " + (sb2.team || 0) + " team games" }),
+          row("Showdown avg place", sa.avgRank, sb2.avgRank, { low: true, nobar: true, f: (v) => "#" + v.toFixed(1), sub: sa.sd + " vs " + sb2.sd + " showdown games" }),
+          row("Trophies", sa.tcn ? sa.net : null, sb2.tcn ? sb2.net : null, { f: (v) => sgn(v), nobar: true }),
+          row("Star player", sa.stars, sb2.stars),
+        ]) + (differ ? '<div class="xnote warn">These battles cover very different stretches of time, so compare them with care.</div>' : "") +
+        '<div class="xnote">Only the battles the game still lists for each player (up to 25). Lower is better for Showdown places.</div>';
+    } else {
+      const best = (l) => l.slice().sort((x, y) => (y.hi || 0) - (x.hi || 0))[0];
+      const ba = best(bA), bb = best(bB);
+      body = table([row("Peak trophies", a.highest, b.highest), row("Best brawler peak", ba && ba.hi, bb && bb.hi, { sub: esc(ba ? title(ba.name) : "—") + " vs " + esc(bb ? title(bb.name) : "—") }),
+        row("Highest brawler now", ba ? Math.max(...bA.map((x) => x.tr || 0)) : null, bb ? Math.max(...bB.map((x) => x.tr || 0)) : null), row("Prestige", a.prestige, b.prestige), row("Total wins", (a.v3 || 0) + (a.solo || 0) + (a.duo || 0), (b.v3 || 0) + (b.solo || 0) + (b.duo || 0))]);
+    }
+    const fr = Math.min(Date.parse(A.r.fetched_at), Date.parse(B.r.fetched_at));
+    return form + head + '<div class="card"><div class="ctrls">' + segH + "</div>" + body + '<div class="xfresh"><i></i><span>Public data fetched ' + esc(ago(fr)) + ". Not tracked.</span></div></div>";
+  }
+
+  // ----- events -----
+  function xSubmitSearch() {
+    const raw = ($("#xQ") || {}).value || "", t = normTag(raw);
+    X.q = raw; X.qErr = "";
+    if (!t) X.qErr = "Type a tag first.";
+    else if (!/^[0289PYLQGRJCUV]*$/.test(t)) X.qErr = "Tags only use 0 2 8 9 P Y L Q G R J C U V. Check for a typo.";
+    else if (!TAG_RE.test(t)) X.qErr = "Tags are 3 to 14 characters.";
+    if (X.qErr) { paintX(); const i = $("#xQ"); if (i) i.focus(); return; }
+    X.q = "";
+    xGo(X.kind === "c" ? { v: "club", tag: t } : { v: "player", tag: t, focus: X.wantBattles });
+    X.wantBattles = false;
+  }
+  function xSubmitVs() {
+    const a = normTag(($("#xA") || {}).value), b = normTag(($("#xB") || {}).value);
+    X.vsErr = "";
+    if (!TAG_RE.test(a) || !TAG_RE.test(b)) X.vsErr = "Enter two player tags (3 to 14 characters, using 0 2 8 9 P Y L Q G R J C U V).";
+    else if (a === b) X.vsErr = "Pick two different players.";
+    if (X.vsErr) { paintX(); return; }
+    xGo({ v: "vs", a, b });
+  }
+  async function xTrack(tag) {
+    const st = X.state["p:" + tag], r = st && st.r;
+    if (r && r.tracked && r.active !== false) {
+      // Already tracked: saving it to this phone is free.
+      X.msg[tag] = { t: "Adding to My stats…" }; paintX();
+      try {
+        const res = await callFn({ action: "profile_add", tag });
+        PROFILES.upsert(cardOf(res.profile));
+        xOpen(tag);
+      } catch (e) {
+        X.msg[tag] = { bad: true, t: e.code === "phone_full" ? phoneFullMsg((e.data && e.data.held) || []) : e.code === "full" ? "The app is following as many players as it can right now (50). Try again later." : "Couldn't add: " + String((e && e.message) || e).slice(0, 100) };
+        paintX();
+      }
+      return;
+    }
+    // Not tracked (or paused): the usual add form, with the club choice and the per-phone limit explained.
+    xClose();
+    showHome({ prefill: tag });
+  }
+  function xOpen(tag) {
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    if (tag === ME && !H.open) { xClose(); return; }
+    xClose();
+    openProfile(tag);
+  }
+  document.addEventListener("click", (ev) => {
+    const t = ev.target.closest && ev.target.closest("button");
+    if (!t) return;
+    const d = t.dataset;
+    if (d.xmode) { if (d.xmode === "explore") { if (!X.open) xGo({ v: "home" }); } else { xClose(); if (!ME && !H.open) showHome(); } return; }
+    if (!X.open || !t.closest("#explore")) return;
+    if ("xback" in d) { xBack(); return; }
+    if (d.xgo) {
+      const [k, a, b] = d.xgo.split(":");
+      if (k === "p") xGo({ v: "player", tag: a });
+      else if (k === "club") xGo({ v: "club", tag: a });
+      else if (k === "vs") xGo({ v: "vs", a: a || "", b: b || "" });
+      else if (k === "search") { X.kind = a === "c" ? "c" : "p"; X.wantBattles = a === "battles"; X.qErr = ""; paintX(); const i = $("#xQ"); if (i) i.focus(); }
+      return;
+    }
+    if (d.xkind) { X.kind = d.xkind; X.qErr = ""; X.q = ($("#xQ") || {}).value || ""; paintX(); const i = $("#xQ"); if (i) i.focus(); return; }
+    if (d.xfilt) { X.filt = d.xfilt; paintX(); return; }
+    if (d.xcat) { X.cat = d.xcat; paintX(); return; }
+    if (d.xsort) { X.sort = d.xsort; paintX(); return; }
+    if (d.xmore) { X.more[d.xmore] = !X.more[d.xmore]; paintX(); return; }
+    if (d.xretry) { const [k, tag] = d.xretry.split(":"); xRetry(k, tag); return; }
+    if (d.xfav) {
+      const [k, tag] = d.xfav.split(":"), st = X.state[k + ":" + tag], o = st && st.r && (k === "p" ? st.r.player : st.r.club);
+      toggleFav(k, tag, o && o.name, o && (k === "p" ? o.icon : o.badge)); paintX(); return;
+    }
+    if ("xclear" in d) { xWrite("xrecent", []); paintX(); return; }
+    if (d.xtrack) { xTrack(d.xtrack); return; }
+    if (d.xopen) { xOpen(d.xopen); return; }
+    if (d.xopenclub) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} location.href = "./?p=" + encodeURIComponent(d.xopenclub) + "#club"; return; }
+    if ("xswap" in d) { const a = $("#xA"), b = $("#xB"); if (a && b) { const v = a.value; a.value = b.value; b.value = v; } return; }
+    if (d.xfill) { const a = $("#xA"), b = $("#xB"); if (a && !a.value.trim()) a.value = d.xfill; else if (b && !b.value.trim() && normTag(a.value) !== d.xfill) b.value = d.xfill; else if (b) b.value = d.xfill; return; }
+  });
+  document.addEventListener("submit", (ev) => {
+    if (ev.target.id === "xSearch") { ev.preventDefault(); xSubmitSearch(); }
+    else if (ev.target.id === "xVs") { ev.preventDefault(); xSubmitVs(); }
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (!X.open || ev.key !== "Escape" || $("#about") || $("#tour") || $("#intro")) return;
+    if (X.route.v === "home") xClose(); else xBack();
+  });
+  window.addEventListener("online", () => { if (X.open) paintX(); });
+
   async function boot() {
     // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
     if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
     const start = await pickProfile();
     const replayWelcome = new URLSearchParams(location.search).has("welcome");
     if (replayWelcome) { try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {} }
-    if (!start) { $("#skel").hidden = true; showHome(); if (!lsGet("welcomed") || replayWelcome) showIntro(); return; } // first time on this phone
+    const xr = xParse(location.hash);
+    if (!start) { $("#skel").hidden = true; showHome(); if (xr) { xShow(xr); return; } if (!lsGet("welcomed") || replayWelcome) showIntro(); return; } // first time on this phone
     if (replayWelcome) setTimeout(showIntro, 0);
     ME = start;
     const card = PROFILES.list().find((p) => p.tag === ME) || {};
     $("#hName").textContent = card.name || "#" + ME;
     $("#hSub").textContent = "Player // #" + ME;
+    if (xr) xShow(xr);
     S.ownerCode = null;
     setTimeout(claimOldCodes, 0);
     const cached = await cacheGet();

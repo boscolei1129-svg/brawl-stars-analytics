@@ -124,7 +124,7 @@ async function thinning() {
   for (const t of tags) {
     const mine = db.T.readings.filter((r) => r.tag === t && r.id >= 1000);
     const byDay = new Map(); for (const r of orig[t]) byDay.set(dayKey(r.ts), (byDay.get(dayKey(r.ts)) || []).concat([r]));
-    ok(t + ": one reading left per old day", mine.length === byDay.size, { left: mine.length, days: byDay.size });
+    ok(t + ": one reading left per old day (plus the very first reading)", mine.length === byDay.size + 1 && mine.some((r) => r.id === orig[t][0].id), { left: mine.length, days: byDay.size });
     let same = true, sameEnd = true;
     for (const [k] of byDay) {
       const upto = (rows) => rows.filter((r) => dayKey(r.ts) <= k);
@@ -153,7 +153,7 @@ async function thinning() {
   ok("a run folds at most its budget of days", part.days === 2, part);
   const rest = await in2.thinReadings(100);
   const nDays = new Set(history("8YRJ090Q2", 5, 30, 4).map((r) => dayKey(r.ts))).size;
-  ok("the next run carries on where it stopped (one reading per day left)", rest.days > 0 && db2.T.readings.length === nDays, { rest, nDays, left: db2.T.readings.length });
+  ok("the next run carries on where it stopped (one reading per day left, plus the first)", rest.days > 0 && db2.T.readings.length === nDays + 1, { rest, nDays, left: db2.T.readings.length });
 }
 
 (async () => {

@@ -16,6 +16,10 @@
 //   POST {action:"push_unsubscribe", tag, endpoint} / {action:"push_test", tag, endpoint}
 //   POST {action:"recap"}                          daily summary for devices whose chosen time just passed (run by the schedule every 5 minutes)
 //   POST {action:"recap_preview", tag}             the daily summary text, without sending it
+// Explore: look at any player or club without tracking it (nothing is saved about the visitor or the player,
+// answers are cached for everyone for a couple of minutes).
+//   POST {action:"explore_player", tag}            public profile, brawlers and the battles the game still lists
+//   POST {action:"explore_club", tag}              club details and members
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
@@ -245,9 +249,8 @@ async function refresh(src: string, p: Profile) {
   const me = p.tag;
   // Opening a profile keeps it on the schedule (and wakes it up if it had paused).
   if (src === "live") {
-    const open: Record<string, unknown> = { last_open_at: new Date().toISOString() };
-    if (p.active === false && (await activeCount()) < MAX_PROFILES) open.active = true;
-    await sb.from("profiles").update(open).eq("tag", me);
+    await sb.from("profiles").update({ last_open_at: new Date().toISOString() }).eq("tag", me);
+    if (p.active === false) await claimSlot(null, me, null); // wakes it while the app has room
   }
   const { data: lastRows, error: lastErr } = await sb.from("readings")
     .select("id, ts, checked, nb, trophies, club_trophies, player").eq("tag", me)
@@ -685,15 +688,29 @@ function ipOf(req: Request) {
 async function ipKey(req: Request) {
   return (await sha256("ip:" + Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") + ":" + ipOf(req))).slice(0, 24);
 }
-// True while `key` has been used at most `max` times in the current `windowS`-second window. If the counter
-// itself fails, the request goes through: a broken limit shouldn't take the app down.
-async function allow(key: string, windowS: number, max: number) {
+// True while `key` has been used at most `max` times in the current `windowS`-second window.
+// If the counter itself fails: `closed` limits refuse (anything that calls the game's API, creates players or
+// devices, or lets someone guess a code), the rest let the request through, since a broken counter
+// shouldn't take goals or alerts down.
+async function allow(key: string, windowS: number, max: number, closed = false) {
   const { data, error } = await sb.rpc("rate_hit", { p_key: key, p_window: windowS, p_max: max });
-  if (error) { console.error("rate_hit", error.message); return true; }
+  if (error) { console.error("rate_hit", error.message); use("limit_error:" + (closed ? "closed" : "open")); return !closed; }
+  if (data !== true) use("limited:" + key.split(":")[0]);
   return data === true;
 }
 class Limited extends Error { constructor() { super("slow_down"); } }
-async function limit(key: string, windowS: number, max: number) { if (!(await allow(key, windowS, max))) throw new Limited(); }
+async function limit(key: string, windowS: number, max: number, closed = false) { if (!(await allow(key, windowS, max, closed))) throw new Limited(); }
+
+// Hourly counts of what the server does (lookups, cache hits, game API calls, limits hit), with no identifiers.
+// They show what Explore costs. Counted in memory and saved once per request.
+const usage: string[] = [];
+const use = (key: string) => { usage.push(key); };
+async function flushUsage() {
+  if (!usage.length) return;
+  const keys = usage.splice(0);
+  const { error } = await sb.rpc("count_usage", { p_keys: keys });
+  if (error) console.error("count_usage", error.message);
+}
 
 // ---------- devices (who owns goals and alerts) ----------
 // A device is known by the hash of its secret. The first write from a new device registers it.
@@ -707,7 +724,7 @@ async function ownerOf(device: unknown, ip: string, create: boolean): Promise<st
     return data.owner;
   }
   if (!create) return null;
-  await limit("newdev:" + ip, 3600, 30);
+  await limit("newdev:" + ip, 3600, 30, true);
   const owner = crypto.randomUUID();
   const ins = await sb.from("device_keys").insert({ key_hash, owner });
   if (ins.error) {
@@ -728,7 +745,7 @@ function sixDigits() {
 // to a device now. Guesses are limited per player and per address.
 async function codeOk(tag: string, code: unknown, ip: string) {
   if (typeof code !== "string" || !code.trim()) return false;
-  if (!(await allow("code:" + tag, 3600, 10)) || !(await allow("codeip:" + ip, 3600, 20))) return false;
+  if (!(await allow("code:" + tag, 3600, 10, true)) || !(await allow("codeip:" + ip, 3600, 20, true))) return false;
   const { data } = await sb.from("profile_codes").select("code_sha256").eq("tag", tag).maybeSingle();
   const ok = !!data && data.code_sha256 === (await sha256(code.trim().toUpperCase()));
   if (!ok) await new Promise((r) => setTimeout(r, 800)); // slow down guessing
@@ -830,13 +847,15 @@ async function thinReadings(budget = 60) {
     }
     if ((rows?.length ?? 0) >= LIM && groups.length > 1) groups.pop(); // the last day may be cut short
     let upto: string | null = null;
-    for (const g of groups) {
+    for (const [gi, g] of groups.entries()) {
       if (days >= budget) break;
       const keep = g[g.length - 1];
-      if (g.length > 1) {
+      // The player's very first reading also stays, so "All" ranges still start where tracking started.
+      const first = gi === 0 && !(await getSetting(mark)) ? 1 : 0;
+      if (g.length > 1 + first) {
         const { error: e2 } = await sb.from("readings").update(foldDay(g)).eq("id", keep.id);
         if (e2) throw e2;
-        const ids = g.slice(0, -1).map((r) => r.id);
+        const ids = g.slice(first, -1).map((r) => r.id);
         for (let i = 0; i < ids.length; i += 300) {
           const { error: e3 } = await sb.from("readings").delete().in("id", ids.slice(i, i + 300));
           if (e3) throw e3;
@@ -851,6 +870,138 @@ async function thinReadings(budget = 60) {
     }
   }
   return { days, removed };
+}
+
+// ---------- Explore: any player or club, without tracking ----------
+// Nothing here creates profiles, devices or schedules. Answers are kept for everyone for a short time (in this
+// server's memory and in a small shared table), so many people looking at the same player cost one call to the
+// game's API. When the game's API can't be reached, a copy up to a day old is shown, labelled as such.
+const EX_TTL = { player: 2 * 60_000, club: 5 * 60_000 };
+const EX_STALE_MS = 24 * 3600_000;
+const EX_NOT_FOUND_MS = 10 * 60_000; // a tag that doesn't exist isn't asked about again for this long
+const EX_MISSES_PER_HOUR = 1000; // fresh fetches Explore may make in an hour, for everyone together (each is 1 or 2 API calls)
+const exMem = new Map<string, { at: number; body: any }>();
+const exFlight = new Map<string, Promise<any>>();
+const exPut = (key: string, v: { at: number; body: any }) => { exMem.delete(key); exMem.set(key, v); if (exMem.size > 400) exMem.delete(exMem.keys().next().value!); };
+const notFound = (m: string) => m === "player_not_found" || m === "club_not_found";
+async function exCached(key: string, ttl: number, fetcher: () => Promise<any>): Promise<{ at: number; body: any; source: string }> {
+  const now = Date.now();
+  const nf = exMem.get("nf:" + key);
+  if (nf && now - nf.at < EX_NOT_FOUND_MS) throw new Error(nf.body);
+  const m = exMem.get(key);
+  if (m && now - m.at < ttl) { use("explore:hit"); return { ...m, source: "cache" }; }
+  if (exFlight.has(key)) { use("explore:joined"); return await exFlight.get(key)!; }
+  const p = (async () => {
+    const { data: row } = await sb.from("explore_cache").select("body, fetched_at").eq("key", key).maybeSingle();
+    const shared = row ? { at: ms(row.fetched_at), body: row.body } : null;
+    if (shared && now - shared.at < ttl) { exPut(key, shared); use("explore:hit"); return { ...shared, source: "cache" }; }
+    const stale = [shared, m].filter(Boolean).sort((a, b) => b!.at - a!.at)[0] ?? null;
+    const staleOk = stale && Date.now() - stale.at < EX_STALE_MS ? { ...stale, source: "stale" } : null;
+    if (!(await allow("exmiss", 3600, EX_MISSES_PER_HOUR, true))) {
+      use("explore:budget");
+      if (staleOk) return staleOk;
+      throw new Limited();
+    }
+    try {
+      const v = { at: Date.now(), body: await fetcher() };
+      use("explore:miss");
+      exPut(key, v);
+      const { error } = await sb.from("explore_cache").upsert({ key, body: v.body, fetched_at: new Date(v.at).toISOString() }, { onConflict: "key" });
+      if (error) console.error("explore_cache", error.message);
+      return { ...v, source: "live" };
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e);
+      if (notFound(msg)) { exPut("nf:" + key, { at: Date.now(), body: msg }); use("explore:not_found"); throw e; }
+      use("explore:upstream_error");
+      if (staleOk) return staleOk;
+      throw new Error("upstream_unavailable");
+    }
+  })();
+  exFlight.set(key, p);
+  try { return await p; } finally { exFlight.delete(key); }
+}
+const is404 = (e: unknown) => / 404$/.test(String((e as Error)?.message ?? e));
+// One battle from the official battle log, from the looked-up player's side. Other players' names and tags are
+// left out on purpose.
+function exBattle(me: string) {
+  return (x: any) => {
+    const b = x?.battle ?? {};
+    let mine: any = null, team: number | null = null;
+    if (Array.isArray(b.teams)) for (const t of b.teams) for (const p of t ?? []) if (strip(p?.tag) === me) { mine = p; team = t.length; }
+    if (!mine && Array.isArray(b.players)) for (const p of b.players) if (strip(p?.tag) === me) mine = p;
+    const br = mine?.brawler ?? (Array.isArray(mine?.brawlers) ? mine.brawlers[0] : null);
+    const t = battleTime(x?.battleTime);
+    if (isNaN(t)) return null;
+    return {
+      t, mode: x?.event?.mode ?? b.mode ?? null, map: x?.event?.map ?? null, type: b.type ?? null,
+      result: b.result ?? null, rank: typeof b.rank === "number" ? b.rank : null, tc: typeof b.trophyChange === "number" ? b.trophyChange : null,
+      dur: typeof b.duration === "number" ? b.duration : null, star: !!b.starPlayer && strip(b.starPlayer.tag) === me,
+      team, players: Array.isArray(b.players) ? b.players.length : null,
+      br: br ? { id: br.id ?? null, name: br.name ?? null, power: br.power ?? null, tr: br.trophies ?? null } : null,
+    };
+  };
+}
+const dedupeBattles = (list: any[]) => {
+  const seen = new Set<string>(), out: any[] = [];
+  for (const b of list) { const k = b.t + "|" + b.mode + "|" + b.map; if (!seen.has(k)) { seen.add(k); out.push(b); } }
+  return out.sort((a, b) => b.t - a.t);
+};
+async function explorePlayerFetch(tag: string) {
+  let pl: any = null, log: any = null;
+  try {
+    [pl, log] = await Promise.all([
+      officialGet(`/players/${encodeURIComponent("#" + tag)}`),
+      officialGet(`/players/${encodeURIComponent("#" + tag)}/battlelog`).catch(() => undefined),
+    ]);
+  } catch (e) {
+    if (is404(e)) throw new Error("player_not_found");
+    pl = null;
+  }
+  if (pl) {
+    return {
+      tag, name: pl.name, icon: pl.icon?.id ?? null, trophies: pl.trophies ?? null, highest: pl.highestTrophies ?? null, exp: pl.expLevel ?? null,
+      v3: pl["3vs3Victories"] ?? null, solo: pl.soloVictories ?? null, duo: pl.duoVictories ?? null, prestige: pl.totalPrestigeLevel ?? null,
+      club: pl.club?.tag ? { tag: strip(pl.club.tag), name: pl.club.name ?? null } : null,
+      brawlers: (pl.brawlers ?? []).map((b: any) => ({ id: b.id ?? null, name: b.name, power: b.power ?? null, rank: b.rank ?? null, tr: b.trophies ?? null, hi: b.highestTrophies ?? null,
+        g: b.gadgets?.length ?? 0, sp: b.starPowers?.length ?? 0, gear: b.gears?.length ?? 0, pr: b.prestigeLevel ?? null })),
+      // undefined: the battle log couldn't be read this time; [] : the game lists no recent battles.
+      battles: log === undefined ? null : dedupeBattles((log?.items ?? []).map(exBattle(tag)).filter(Boolean)),
+      src: "official",
+    };
+  }
+  // No API key, or the official API is down: BrawlTime knows the same public profiles.
+  let d: any = null;
+  try { d = await getFeedRetry(() => feed("player.byTag", tag)); } catch (e) { if (is404(e)) throw new Error("player_not_found"); throw e; }
+  if (!d?.name) throw new Error("player_not_found");
+  const cp = compactPlayer(d, tag);
+  return {
+    tag, name: d.name, icon: d.icon?.id ?? null, trophies: d.trophies ?? null, highest: d.highestTrophies ?? null, exp: d.expLevel ?? null,
+    v3: d["3vs3Victories"] ?? null, solo: d.soloVictories ?? null, duo: d.duoVictories ?? null, prestige: d.totalPrestigeLevel ?? null,
+    club: d.club?.tag ? { tag: strip(d.club.tag), name: d.club.name ?? null } : null,
+    brawlers: Object.values<any>(d.brawlers ?? {}).map((b: any) => ({ id: b.id ?? null, name: b.name, power: b.power ?? null, rank: b.rank ?? null, tr: b.trophies ?? null, hi: b.highestTrophies ?? null,
+      g: Array.isArray(b.gadgets) ? b.gadgets.length : 0, sp: Array.isArray(b.starPowers) ? b.starPowers.length : 0, gear: Array.isArray(b.gears) ? b.gears.length : 0, pr: b.prestigeLevel ?? null })),
+    battles: dedupeBattles(cp.battles.map((x: any) => {
+      const rank = /(\d+)/.exec(String(x.result ?? ""));
+      return { t: ms(x.t), mode: x.mode, map: x.map, type: x.ranked ? "ranked" : null,
+        result: x.win === true && !rank ? "victory" : x.win === false && !rank ? "defeat" : !rank && x.result === "draw" ? "draw" : null,
+        rank: rank ? +rank[1] : null, tc: x.tc, dur: null, star: false, team: null, players: null, br: x.brawler ? { id: null, name: x.brawler, power: null, tr: null } : null };
+    })),
+    src: "brawltime",
+  };
+}
+async function exploreClubFetch(tag: string) {
+  let c: any = null, src = "official";
+  try { c = await getOfficialClub(tag); } catch (e) { if (is404(e)) throw new Error("club_not_found"); c = null; }
+  if (c === null) {
+    src = "brawltime";
+    try { c = await getFeedRetry(() => feed("club.byTag", tag)); } catch (e) { if (is404(e)) throw new Error("club_not_found"); throw e; }
+  }
+  if (!c?.name) throw new Error("club_not_found");
+  return {
+    tag, name: c.name, desc: c.description ?? null, type: c.type ?? null, badge: c.badgeId ?? null, req: c.requiredTrophies ?? null, trophies: c.trophies ?? null,
+    members: (c.members ?? []).map((m: any) => [strip(m.tag), m.name, m.role ?? null, m.trophies ?? null, m.icon?.id ?? null]).sort((a: any[], b: any[]) => (b[3] ?? 0) - (a[3] ?? 0)),
+    src,
+  };
 }
 
 async function activeCount() {
@@ -868,7 +1019,17 @@ async function heldBy(owner: string): Promise<string[]> {
   if (e2) throw e2;
   return (act ?? []).map((r: any) => r.tag);
 }
-// Room for one more active profile, started by this owner. Returns an error response, or null when there's room.
+// Takes a spot for a profile in one locked database step, so two requests at the same moment can't both squeeze
+// into the last spot: starts it (inserting `row` if it's new) when the app and this owner have room, and records
+// the owner as holding it. Without an owner it only wakes a paused profile when the app has room.
+async function claimSlot(owner: string | null, tag: string, row: Record<string, unknown> | null) {
+  const { data, error } = await sb.rpc("claim_slot", { p_owner: owner, p_tag: tag, p_row: row, p_max: MAX_PROFILES, p_per: PER_DEVICE });
+  if (error) throw error;
+  return data as { status: "ok" | "exists" | "full" | "phone_full"; held?: string[] };
+}
+const slotFail = (r: { status: string; held?: string[] }) =>
+  r.status === "full" ? fail("full", 409) : r.status === "phone_full" ? json({ ok: false, error: "phone_full", held: r.held ?? [] }, 409) : null;
+// A quick check before calling the game's API (claimSlot checks again, under the lock).
 async function roomFor(owner: string) {
   if ((await activeCount()) >= MAX_PROFILES) return fail("full", 409);
   const held = await heldBy(owner);
@@ -883,6 +1044,11 @@ const publicProfile = (p: any) => ({ tag: p.tag, club: p.club, name: p.name, ico
 const fail = (error: string, status = 400) => json({ ok: false, error }, status);
 
 Deno.serve(async (req) => {
+  const res = await handle(req);
+  await flushUsage();
+  return res;
+});
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
   let body: any = {};
@@ -893,7 +1059,7 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case "profile_lookup": {
         if (!TAG_RE.test(tag)) return fail("bad_tag");
-        await limit("look:" + ip, 600, 40);
+        await limit("look:" + ip, 600, 40, true);
         const [found, existing] = await Promise.all([lookup(tag, body.club), getProfile(tag)]);
         return json({ ok: true, ...found, tracked: !!existing, profile: existing ? publicProfile(existing) : null });
       }
@@ -909,9 +1075,9 @@ Deno.serve(async (req) => {
             // Paused: starting it up again takes a spot, like adding a new player.
             const owner = await ownerOf(body.device, ip, true);
             if (!owner) return fail("no_device", 401);
-            const full = await roomFor(owner);
-            if (full) return full;
-            await hold(owner, tag);
+            const r = await claimSlot(owner, tag, null);
+            const bad = slotFail(r);
+            if (bad) return bad;
             Object.assign(patch, { active: true, last_open_at: new Date().toISOString() });
           }
           if (!existing.follow && body.club === undefined) patch.follow = true;
@@ -920,7 +1086,7 @@ Deno.serve(async (req) => {
         }
         const owner = await ownerOf(body.device, ip, true);
         if (!owner) return fail("no_device", 401);
-        await limit("add:" + ip, 3600, 6);
+        await limit("add:" + ip, 3600, 6, true);
         const full = await roomFor(owner);
         if (full) return full;
         const found = await lookup(tag, body.club);
@@ -928,9 +1094,10 @@ Deno.serve(async (req) => {
         const follow = body.club === undefined || !!found.club?.own || (!found.club && !found.player.club);
         const row = { tag, club: found.club?.tag ?? null, name: found.player.name, icon: found.player.icon, trophies: found.player.trophies,
           club_name: found.club?.name ?? null, club_badge: found.club?.badge ?? null, follow };
-        const { error } = await sb.from("profiles").insert(row);
-        if (error) { if (error.code === "23505") return json({ ok: true, exists: true, profile: row }); throw error; }
-        await hold(owner, tag);
+        const claim = await claimSlot(owner, tag, row);
+        const bad = slotFail(claim);
+        if (bad) return bad;
+        if (claim.status === "exists") return json({ ok: true, exists: true, profile: publicProfile((await getProfile(tag)) ?? row) });
         // First reading now, so the dashboard has something to show straight away.
         let first: unknown = null;
         try { first = await refresh("live", row); } catch (e) { first = { error: String((e as Error)?.message ?? e) }; }
@@ -951,6 +1118,22 @@ Deno.serve(async (req) => {
           paused = !!data?.length;
         }
         return json({ ok: true, released: true, paused });
+      }
+      case "explore_player": {
+        if (!body.tag || !TAG_RE.test(tag)) return fail("bad_tag");
+        await limit("ex:" + ip, 600, 60, true);
+        use("explore:player");
+        const r = await exCached("p:" + tag, EX_TTL.player, () => explorePlayerFetch(tag));
+        const prof = await getProfile(tag);
+        return json({ ok: true, player: r.body, fetched_at: new Date(r.at).toISOString(), source: r.source, tracked: !!prof, active: prof?.active ?? null });
+      }
+      case "explore_club": {
+        if (!body.tag || !TAG_RE.test(tag)) return fail("bad_tag");
+        await limit("ex:" + ip, 600, 60, true);
+        use("explore:club");
+        const r = await exCached("c:" + tag, EX_TTL.club, () => exploreClubFetch(tag));
+        const { data: fol } = await sb.from("profiles").select("tag").eq("club", tag).eq("active", true).limit(1);
+        return json({ ok: true, club: r.body, fetched_at: new Date(r.at).toISOString(), source: r.source, tracked_via: fol?.[0]?.tag ?? null });
       }
       case "refresh": {
         const p = await getProfile(tag);
@@ -1008,8 +1191,8 @@ Deno.serve(async (req) => {
       case "link_redeem": {
         if (typeof body.device !== "string" || !DEV_RE.test(body.device)) return fail("no_device", 401);
         // Six digits are only safe because guesses are scarce: per address, and for everyone together.
-        await limit("linkr:" + ip, 3600, 10);
-        await limit("linkr:all", 3600, 300);
+        await limit("linkr:" + ip, 3600, 10, true);
+        await limit("linkr:all", 3600, 300, true);
         const code = String(body.code ?? "").replace(/\D/g, "");
         if (code.length !== 6) return fail("bad_link");
         const code_hash = await sha256("link:" + code);
@@ -1081,7 +1264,7 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
       case "push_test": {
-        await limit("ptest:" + ip, 3600, 20);
+        await limit("ptest:" + ip, 3600, 20, true);
         const { data } = await sb.from("push_subs").select("*").eq("endpoint", String(body.endpoint ?? "")).eq("tag", tag);
         if (!data?.length) return fail("not_subscribed", 404);
         const p = await getProfile(tag);
@@ -1090,7 +1273,7 @@ Deno.serve(async (req) => {
       }
       case "push_selftest": {
         // Builds (but doesn't send) an encrypted push for a test subscription, to check the crypto works here.
-        await limit("selftest:" + ip, 3600, 10);
+        await limit("selftest:" + ip, 3600, 10, true);
         const sub = cleanSub(body.sub);
         if (!sub) return fail("bad_subscription");
         const v = await vapid();
@@ -1110,6 +1293,8 @@ Deno.serve(async (req) => {
           const old = new Date(Date.now() - KEEP_BATTLES_DAYS * 86_400_000).toISOString();
           await sb.from("battles").delete().lt("t", old);
           await sb.from("sessions").delete().lt("ended_at", old);
+          await sb.from("explore_cache").delete().lt("fetched_at", new Date(Date.now() - EX_STALE_MS).toISOString());
+          await sb.from("usage_counters").delete().lt("hour", new Date(Date.now() - 90 * 86_400_000).toISOString());
           // Old readings are folded a limited number of days at a time, so a run never takes long.
           try { (out as any).thinned = await thinReadings(); } catch (e) { console.error("thin", (e as Error)?.message ?? e); }
         }
@@ -1130,4 +1315,4 @@ Deno.serve(async (req) => {
     if (["player_not_found", "club_not_found", "bad_club"].includes(msg)) return fail(msg, 404);
     return json({ ok: false, error: msg }, 502);
   }
-});
+}

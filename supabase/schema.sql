@@ -43,8 +43,9 @@ create table public.settings (
   key text primary key,
   value text not null
 );
--- settings also holds 'brawlers_full' and 'club_full' (the current full lists), 'vapid' (the server's
--- private push keys) and 'notify_state' (what was last announced), all written by the function.
+-- settings also holds 'brawlers_full' and 'club_full' (the current full lists), 'activity_at' (when
+-- battle logs were last read), 'vapid' (the server's private push keys) and 'notify_state' (what was
+-- last announced), all written by the function.
 -- insert into public.settings values ('owner_code_sha256', encode(sha256(convert_to('YOURCODE', 'UTF8')), 'hex'));
 
 alter table public.readings enable row level security;
@@ -91,3 +92,25 @@ select cron.schedule(
        headers := '{"Content-Type":"application/json"}'::jsonb,
        timeout_milliseconds := 60000) $$
 );
+
+-- Play sessions of club members, built from their battle logs: battles less than 20 minutes apart
+-- belong to the same session. Brawl Stars doesn't share online status, so playing is the signal.
+create table if not exists public.sessions (
+  id bigint generated always as identity primary key,
+  tag text not null,
+  started_at timestamptz not null,   -- about 3 minutes before the first battle ended
+  ended_at timestamptz not null,     -- when the last battle ended
+  battles integer not null default 1,
+  tc integer not null default 0,     -- trophies won or lost in the session
+  modes jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists sessions_tag_end_idx on public.sessions (tag, ended_at desc);
+create index if not exists sessions_end_idx on public.sessions (ended_at);
+create index if not exists sessions_updated_idx on public.sessions (updated_at);
+alter table public.sessions enable row level security;
+create policy "Anyone can read sessions" on public.sessions for select to anon, authenticated using (true);
+
+-- Each member's most recent session (what the server extends when new battles arrive).
+create or replace view public.latest_sessions with (security_invoker = true) as
+  select distinct on (tag) * from public.sessions order by tag, ended_at desc;

@@ -1,6 +1,6 @@
 # Brawl Stars Analytics
 
-A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Stargazers)**. It shows trophy growth, win rate, modes and maps, brawlers, the club member board, and goals with ETAs.
+A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Stargazers)**. It shows trophy growth, win rate, modes and maps, brawlers, the club member board, when club members play, and goals with ETAs.
 
 ## How it works
 
@@ -8,17 +8,19 @@ A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Starga
 - **The server function** (`supabase/functions/brawl`) fetches fresh data from BrawlTime and saves a reading plus any new battles. The sync button calls it, and so does the app while it's open (every 3 minutes). It also adds and removes goals, but only for someone who knows the owner code.
 - **The schedule.** A Supabase cron job calls the function every 15 minutes, so history builds up even when the app is closed.
 - **Club data.** Club member lists, from BrawlTime and from Supercell's own API, can be up to about an hour behind the game. With an official Brawl Stars API key saved as the `BS_API_KEY` secret in Supabase, the function reads every member's live profile through RoyaleAPI's proxy (`bsproxy.royaleapi.dev`; allow IP `45.79.218.79` on the key) and adds up the club total itself. Without a key, only your own row is live.
+- **Club activity.** Brawl Stars doesn't share who is online, so the app goes by play instead. The function reads each member's last 25 battles (at most every 4 minutes) and groups battles less than 20 minutes apart into play sessions. A member counts as online if they finished a battle in the last 12 minutes. The Activity tab shows who is playing now, a 24-hour timeline for each of the last 7 days, the club's usual hours by weekday (a heatmap that fills in over two weeks), and the most active members this week. Tap a member for their sessions and usual hours. Times are in the viewer's own time zone.
 - **Notifications.** On the Goals tab, after unlocking with the owner code, each device can turn on alerts: goals reached, trophy milestones (every 500 for you, every 5,000 for the club), members joining or leaving, and a nightly recap at 10 PM Shanghai time. On iPhone and iPad this works once the app is added to the Home Screen and opened from there. The server signs notifications with its own keys (made on first use, kept private in the database).
 - **Opening fast.** The page, fonts and icons stay on your device (`sw.js`), and so do the stats it has already downloaded. The app opens instantly and then fetches only what's new. An update to the site shows up the second time you open it.
 - **Lean storage.** When a check finds nothing new, the server marks the last reading as confirmed instead of saving a copy. Brawler lists are saved as changes only.
-- **The database** (`supabase/schema.sql`) has five tables:
+- **The database** (`supabase/schema.sql`) has six tables:
   - `readings`: one row per update.
   - `battles`: one row per battle, keyed by time.
   - `goals`.
+  - `sessions`: club members' play sessions.
   - `settings`: private. It holds the owner-code hash, the current full brawler and club lists, and the push keys.
   - `push_subs`: private. Devices that turned on notifications.
 
-  Anyone can read the first three. Only the function can write to any of them, or read the last two.
+  Anyone can read the first four. Only the function can write to any of them, or read the last two.
 
 ## Owner code
 
@@ -37,7 +39,7 @@ update settings set value = encode(sha256(convert_to('NEWCODE', 'UTF8')), 'hex')
 
 ## Notes
 
-- Trophy history starts on Oct 19, 2026, when tracking began.
+- Trophy history starts on Oct 19, 2026, when tracking began. Club activity starts on Oct 20, 2026; days before that only include each member's last 25 battles.
 - Solo Showdown counts a top-5 finish as a win, as BrawlTime does.
 - A free Supabase project can pause after a week without activity. The cron job's calls should keep it awake. If it ever pauses, restore it from the Supabase dashboard.
 - Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`).

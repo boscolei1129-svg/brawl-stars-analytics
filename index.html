@@ -285,12 +285,12 @@ section[data-tab] { display: grid; gap: 12px; }
   padding-right: max(8px, env(safe-area-inset-right, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .sec-label { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); }
 .sec-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .tabbar button {
   background: none; border: 0; border-top: 2px solid transparent; color: var(--muted);
-  font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 15px 0 14px; min-height: var(--tabbar-h);
+  font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; padding: 15px 0 14px; min-height: var(--tabbar-h);
 }
 .tabbar button[aria-current="page"] { border-top-color: var(--accent); color: var(--accent); font-weight: 700; }
 
@@ -298,7 +298,7 @@ section[data-tab] { display: grid; gap: 12px; }
   .tile { padding: 9px 9px; }
   .tile .v { font-size: 17px; }
   .detail { padding-left: 0; }
-  .tabbar button { letter-spacing: 0.5px; font-size: 10.5px; }
+  .tabbar button { letter-spacing: 0.2px; font-size: 10px; }
 }
 /* Tablet and wider: two columns of panels (built by layoutColumns in the script). */
 .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -332,6 +332,62 @@ section[data-tab] { display: grid; gap: 12px; }
 .toggle i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform 0.18s ease, background-color 0.18s ease; }
 .toggle[aria-checked="true"] { background: rgba(39, 211, 195, 0.18); border-color: rgba(39, 211, 195, 0.6); }
 .toggle[aria-checked="true"] i { transform: translateX(18px); background: var(--teal); }
+
+/* Activity */
+.act-now .big-row { display: flex; align-items: baseline; gap: 10px; }
+.act-now .of { font-family: var(--font-num); color: var(--muted); font-size: 14px; }
+.pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); display: inline-block; box-shadow: 0 0 0 0 rgba(39, 211, 195, 0.6); animation: ping 1.8s ease-out infinite; flex: none; }
+.pulse.off { background: var(--muted); animation: none; box-shadow: none; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(39, 211, 195, 0.55); } 80%, 100% { box-shadow: 0 0 0 10px rgba(39, 211, 195, 0); } }
+.who-on { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.who-on .p { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(39, 211, 195, 0.35); background: rgba(39, 211, 195, 0.07); padding: 4px 10px 4px 4px; font-size: 13px; font-weight: 600; }
+.who-on .p .mono { width: 26px; height: 26px; font-size: 10px; }
+.who-on .p .ago { font-family: var(--font-num); font-size: 11px; color: var(--teal); font-weight: 500; }
+.axis { position: relative; height: 16px; margin: 4px 0 2px; font-family: var(--font-num); font-size: 10px; color: var(--muted); }
+.axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.axis span:first-child { transform: none; } .axis span:last-child { transform: translateX(-100%); }
+.arow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "av nm tot" "tr tr tr"; align-items: center; column-gap: 10px; row-gap: 7px;
+  width: 100%; padding: 11px 0; background: none; border: 0; border-top: 1px solid var(--line-2); color: inherit; font: inherit; text-align: left; }
+.arow:first-child { border-top: 0; }
+.arow > .mono { grid-area: av; }
+.arow .nm { grid-area: nm; min-width: 0; font-weight: 600; font-size: 14.5px; display: flex; align-items: center; gap: 7px; overflow: hidden; white-space: nowrap; }
+.arow .nm b { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.arow .tot { grid-area: tot; font-family: var(--font-num); font-size: 12px; color: var(--fg-2); text-align: right; }
+.arow .tot small { display: block; color: var(--muted); font-size: 10.5px; }
+.track { grid-area: tr; position: relative; height: 14px; background-color: var(--raise); border: 1px solid var(--line-2);
+  background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(12.5% - 1px), var(--line-2) calc(12.5% - 1px), var(--line-2) 12.5%); }
+.track .blk { position: absolute; top: 2px; bottom: 2px; min-width: 3px; background: linear-gradient(180deg, #3fe6d6, #1fb3a5); border-radius: 1px; }
+.track .blk.live { background: linear-gradient(180deg, #7ff5ea, #27d3c3); box-shadow: 0 0 10px rgba(39, 211, 195, 0.75); }
+.track .now { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--accent); box-shadow: 0 0 6px rgba(255, 122, 26, 0.7); }
+.track.grow .blk { transform-origin: left center; animation: growx 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes growx { from { transform: scaleX(0); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.adetail { padding: 2px 0 14px 44px; display: grid; gap: 10px; }
+.adetail .sess { display: grid; gap: 6px; }
+.adetail .sess div { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.adetail .sess span:last-child { font-family: var(--font-num); color: var(--fg-2); font-size: 12px; text-align: right; }
+.strip { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; }
+.strip i, .heat i { display: block; aspect-ratio: 1 / 1; background: rgba(39, 211, 195, var(--a, 0)); border: 1px solid var(--line-2); }
+.heat { display: grid; grid-template-columns: 30px repeat(24, minmax(0, 1fr)); gap: 2px; align-items: center; }
+.heat b { font-family: var(--font-num); font-size: 10px; color: var(--muted); font-weight: 500; }
+.heat i.peak { border-color: var(--teal); box-shadow: 0 0 8px rgba(39, 211, 195, 0.6); }
+.heat-x { display: grid; grid-template-columns: 30px repeat(4, minmax(0, 1fr)); font-family: var(--font-num); font-size: 10px; color: var(--muted); margin-top: 4px; }
+.legend-ramp { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.legend-ramp i { width: 60px; height: 8px; background: linear-gradient(90deg, rgba(39, 211, 195, 0.05), rgba(39, 211, 195, 1)); border: 1px solid var(--line-2); }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); margin-bottom: 12px; }
+.days button { border: 0; border-right: 1px solid var(--line); background: none; color: var(--muted); padding: 7px 0 6px; display: grid; justify-items: center; gap: 2px; }
+.days button:last-child { border-right: 0; }
+.days button span { font-size: 9.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.days button b { font-family: var(--font-num); font-size: 15px; font-weight: 600; color: var(--fg-2); }
+.days button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+.days button[aria-pressed="true"] b { color: var(--accent); }
+.barrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) 76px; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line-2); }
+.barrow:first-child { border-top: 0; }
+.barrow .bar { height: 6px; background: var(--raise); margin-top: 6px; }
+.barrow .bar i { display: block; height: 100%; background: linear-gradient(90deg, #1fb3a5, #3fe6d6); }
+.barrow .nm { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barrow .end { font-family: var(--font-num); font-size: 12.5px; text-align: right; }
+.barrow .end small { display: block; color: var(--muted); font-size: 10.5px; }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .track.grow .blk { animation: none; } }
 
 /* Motion */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -378,6 +434,7 @@ button:active { transform: scale(0.97); }
     <div class="skel" id="skel" role="status" aria-label="Loading your stats"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><div class="sk d"></div></div>
     <section data-tab="me" hidden></section>
     <section data-tab="club" hidden></section>
+    <section data-tab="activity" hidden></section>
     <section data-tab="brawlers" hidden></section>
     <section data-tab="goals" hidden></section>
   </main>
@@ -387,6 +444,7 @@ button:active { transform: scale(0.97); }
   <nav aria-label="Sections">
     <button data-go="me" aria-current="page">Me</button>
     <button data-go="club">Club</button>
+    <button data-go="activity">Activity</button>
     <button data-go="brawlers">Brawlers</button>
     <button data-go="goals">Goals</button>
   </nav>
@@ -405,7 +463,7 @@ button:active { transform: scale(0.97); }
   const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
 
   const S = {
-    readings: [], battleRows: [], goals: [], ver: 0, loaded: false, ownerCode: null, goalBusy: false,
+    readings: [], battleRows: [], goals: [], sessions: [], actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
     tab: "me", live: { busy: false, err: null, at: 0 },
     r: { me: "24h", climb: "7d", club: "7d", members: "7d" },
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
@@ -480,7 +538,7 @@ button:active { transform: scale(0.97); }
     return r.json();
   }
   async function restAll(table, select, filter) {
-    const out = [], page = 1000, order = table === "battles" ? "t" : "ts";
+    const out = [], page = 1000, order = table === "battles" ? "t" : table === "sessions" ? "id" : "ts";
     for (let off = 0; off < 200000; off += page) {
       const rows = await rest(table + "?select=" + select + (filter ? "&" + filter : "") + "&order=" + order + ".asc&limit=" + page + "&offset=" + off);
       out.push(...rows);
@@ -519,22 +577,36 @@ button:active { transform: scale(0.97); }
     });
   }
   const cacheGet = () => Promise.race([idb("readonly", (st) => st.get("data")).catch(() => null), new Promise((r) => setTimeout(() => r(null), 1500))]);
-  const cacheSet = () => idb("readwrite", (st) => st.put({ v: CACHE_V, at: Date.now(), readings: S.readings, battleRows: S.battleRows, goals: S.goals }, "data")).catch(() => {});
+  const cacheSet = () => idb("readwrite", (st) => st.put({ v: CACHE_V, at: Date.now(), readings: S.readings, battleRows: S.battleRows, goals: S.goals, sessions: S.sessions }, "data")).catch(() => {});
+  // Members' play sessions: the last 15 days on first load, then only the ones that changed since.
+  const SESSION_DAYS = 15;
+  async function loadSessions(full) {
+    const cutoff = Date.now() - SESSION_DAYS * DAY;
+    const keep = (rows) => rows.filter((r) => msOf(r.ended_at) >= cutoff);
+    if (full || !S.sessions.length) return keep(await restAll("sessions", "*", "ended_at=gte." + encodeURIComponent(new Date(cutoff).toISOString())));
+    const since = S.sessions.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), "");
+    const fresh = await restAll("sessions", "*", "updated_at=gt." + encodeURIComponent(since));
+    const byId = new Map(S.sessions.map((r) => [r.id, r]));
+    for (const r of fresh) byId.set(r.id, r);
+    return keep([...byId.values()]);
+  }
   async function loadData(full) {
     if (full || !S.readings.length) {
-      const [rd, bt, gl] = await Promise.all([restAll("readings", READ_COLS), restAll("battles", "*"), rest("goals?select=*&order=created_at.asc")]);
-      S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal);
+      const [rd, bt, gl, ss] = await Promise.all([restAll("readings", READ_COLS), restAll("battles", "*"), rest("goals?select=*&order=created_at.asc"), loadSessions(true)]);
+      S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal); S.sessions = ss;
     } else {
       const lastId = Math.max(...S.readings.map((r) => r.id));
       const lastT = S.battleRows.length ? Math.max(...S.battleRows.map((b) => msOf(b.t))) : 0;
       // Battles can arrive slightly out of order, so look back a few hours and de-duplicate.
       const since = new Date(Math.max(0, lastT - 6 * HOUR)).toISOString();
       // The newest reading is fetched again: when nothing changed, the server only moves its "checked" time.
-      const [rd, bt, gl] = await Promise.all([
+      const [rd, bt, gl, ss] = await Promise.all([
         restAll("readings", READ_COLS, "id=gte." + lastId),
         restAll("battles", "*", "t=gt." + encodeURIComponent(since)),
         rest("goals?select=*&order=created_at.asc"),
+        loadSessions(false),
       ]);
+      S.sessions = ss;
       if (!rd.some((r) => r.id === lastId)) return loadData(true); // saved copy no longer matches the server
       const rm = new Map(S.readings.map((r) => [r.id, r]));
       for (const r of rd) rm.set(r.id, r);
@@ -1117,6 +1189,9 @@ button:active { transform: scale(0.97); }
       const form = sec.querySelector("#goalForm"), formCard = form && form.closest("section > *");
       let after = false;
       for (const k of kids) { if (after) right.add(k); if (k === formCard) after = true; }
+    } else if (tab === "activity") {
+      // Left: who's online, club rhythm and most active. Right: the 24-hour timeline.
+      for (const k of kids) if (k.id === "act-timeline") right.add(k);
     } else if (tab === "club") {
       // Summary and chart on the left; member board and roster changes on the right.
       const board = kids.findIndex((k) => k.querySelector('[data-seg="memSort"]'));
@@ -1162,6 +1237,164 @@ button:active { transform: scale(0.97); }
       if (p >= 1) delete running[k];
     }
     if (Object.keys(running).length) countUps.raf = requestAnimationFrame(stepCounts);
+  }
+
+  // ---------- activity ----------
+  // Brawl Stars doesn't share who is online, so activity comes from battle logs: a member counts as
+  // online when they finished a battle in the last ONLINE_MS, and play sessions are runs of battles.
+  const ONLINE_MS = 12 * 60e3;
+  const dur = (v) => { const m = Math.round(v / 60e3); if (m < 1) return "<1m"; const h = Math.floor(m / 60); return h ? h + "h" + (m % 60 ? " " + (m % 60) + "m" : "") : m + "m"; };
+  const dayStart = (back) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - back); return d.getTime(); };
+  const hourLabel = (h) => (h % 12 || 12) + (h < 12 ? " AM" : " PM");
+  const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let ACT = null;
+  function activity() {
+    const now = Date.now();
+    if (ACT && ACT.ver === S.ver && now - ACT.at < 30e3) return ACT;
+    const info = new Map();
+    for (const s of D.cs) for (const m of s.c.members || []) info.set(m[0], { tag: m[0], name: m[1], role: m[2], icon: m[4] });
+    const cur = (D.C && D.C.c.members) || [];
+    for (const m of cur) info.set(m[0], { tag: m[0], name: m[1], role: m[2], icon: m[4] });
+    const by = new Map();
+    for (const r of S.sessions) {
+      const a = by.get(r.tag) || [];
+      a.push({ s: msOf(r.started_at), e: msOf(r.ended_at), n: r.battles || 0, tc: r.tc || 0, modes: r.modes || {} });
+      by.set(r.tag, a);
+    }
+    for (const a of by.values()) a.sort((x, y) => x.s - y.s);
+    const members = cur.map((m) => info.get(m[0]));
+    const lastEnd = (tag) => { const a = by.get(tag); return a && a.length ? a[a.length - 1].e : null; };
+    const online = members.filter((m) => { const e = lastEnd(m.tag); return e != null && now - e <= ONLINE_MS; }).sort((a, b) => lastEnd(b.tag) - lastEnd(a.tag));
+    // Tracking started when the server first read the battle logs (earlier sessions come from those logs' history).
+    const first = S.sessions.length ? Math.min(...S.sessions.map((r) => msOf(r.updated_at) || now)) : null;
+    // Club rhythm: average number of members playing in each weekday-hour over the last 14 days.
+    const from = Math.max(first || now, dayStart(13));
+    const slots = new Map(), denom = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    for (let t = new Date(from).setMinutes(0, 0, 0); t <= now; t += HOUR) { const d = new Date(t); denom[d.getDay()][d.getHours()]++; }
+    for (const [tag, a] of by) for (const x of a) {
+      if (x.e < from) continue;
+      for (let t = new Date(Math.max(x.s, from)).setMinutes(0, 0, 0); t < x.e; t += HOUR) {
+        const k = t; if (!slots.has(k)) slots.set(k, new Set()); slots.get(k).add(tag);
+      }
+    }
+    const sum = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    for (const [t, set] of slots) { const d = new Date(t); sum[d.getDay()][d.getHours()] += set.size; }
+    const avg = sum.map((row, wd) => row.map((v, h) => (denom[wd][h] ? v / denom[wd][h] : 0)));
+    const byHour = new Array(24).fill(0).map((_, h) => { let s = 0, n = 0; for (let wd = 0; wd < 7; wd++) { s += sum[wd][h]; n += denom[wd][h]; } return n ? s / n : 0; });
+    const peakH = byHour.reduce((b, v, h) => (v > byHour[b] ? h : b), 0);
+    let peakCell = null; for (let wd = 0; wd < 7; wd++) for (let h = 0; h < 24; h++) if (!peakCell || avg[wd][h] > avg[peakCell[0]][peakCell[1]]) peakCell = [wd, h];
+    const days = first ? Math.max(1, Math.ceil((now - from) / DAY)) : 0;
+    ACT = { ver: S.ver, at: now, info, by, members, online, lastEnd, first, avg, byHour, peakH, peakCell, days, from };
+    return ACT;
+  }
+  // Play time and battles between t0 and t1 (sessions clipped to the window).
+  function playIn(a, t0, t1) {
+    let ms = 0, n = 0, tc = 0, k = 0;
+    for (const x of a || []) {
+      const s = Math.max(x.s, t0), e = Math.min(x.e, t1);
+      if (e > s || (x.e >= t0 && x.e <= t1)) { ms += Math.max(0, e - s); n += x.n; tc += x.tc; k++; }
+    }
+    return { ms, n, tc, k };
+  }
+  // How often (share of days) a member played in each hour, over the last 14 days.
+  function usualHours(a, from, now) {
+    const hits = new Array(24).fill(0), seen = new Set();
+    for (const x of a || []) {
+      if (x.e < from) continue;
+      for (let t = new Date(Math.max(x.s, from)).setMinutes(0, 0, 0); t < x.e; t += HOUR) {
+        const d = new Date(t), key = d.toDateString() + "|" + d.getHours();
+        if (!seen.has(key)) { seen.add(key); hits[d.getHours()]++; }
+      }
+    }
+    const nDays = Math.max(1, Math.round((now - from) / DAY));
+    return hits.map((v) => Math.min(1, v / nDays));
+  }
+  const modeTop = (modes) => { const e = Object.entries(modes || {}).sort((a, b) => b[1] - a[1])[0]; return e ? modeName(e[0]) : ""; };
+  function renderActivity() {
+    if (!D.C) return emptyState("Club activity appears after the first update.");
+    const A = activity(), now = Date.now();
+    if (!S.sessions.length)
+      return '<div class="card cut"><h2>Club activity</h2><div class="chart-empty" style="min-height:120px">Collecting activity. The server reads every member\'s battle log every 15 minutes, so the first sessions show up shortly.</div></div>';
+    const today0 = dayStart(0);
+    const playedToday = A.members.filter((m) => playIn(A.by.get(m.tag), today0, now).k > 0);
+    const clubToday = A.members.reduce((t, m) => t + playIn(A.by.get(m.tag), today0, now).ms, 0);
+    const avatar = (m, cls) => '<span class="mono ' + (cls || "sm") + '">' + art(ART.icon(m.icon)) + esc(initials(m.name)) + "</span>";
+    // Now
+    const nowCard =
+      '<div class="card cut act-now" id="act-now">' +
+        '<div class="hud-k k-label"><span>Online now</span><span>Stargazers</span></div>' +
+        '<div class="big-row"><span class="pulse' + (A.online.length ? "" : " off") + '"></span><span class="hero-num teal" data-k="online" data-v="' + A.online.length + '" style="margin:6px 0">' + A.online.length + '</span><span class="of">/ ' + A.members.length + " playing</span></div>" +
+        (A.online.length
+          ? '<div class="who-on">' + A.online.map((m) => '<span class="p">' + avatar(m) + esc(m.name) + '<span class="ago">' + esc(agoShort(A.lastEnd(m.tag))) + "</span></span>").join("") + "</div>"
+          : (() => { const lastM = A.members.filter((m) => A.lastEnd(m.tag)).sort((a, b) => A.lastEnd(b.tag) - A.lastEnd(a.tag))[0];
+              return '<div class="sub">No one is in a battle right now.' + (lastM ? " Last active: " + esc(lastM.name) + ", " + esc(ago(A.lastEnd(lastM.tag))) + "." : "") + "</div>"; })()) +
+        '<div class="sub mt">Brawl Stars doesn\'t show who\'s online, so a member counts as online if they finished a battle in the last 12 minutes. Battle logs are read every 15 minutes (more often while the app is open).</div>' +
+      "</div>";
+    const tiles =
+      '<div class="tiles">' +
+        '<div class="tile"><div class="k">Played today</div><div class="v">' + playedToday.length + '</div><div class="n">of ' + A.members.length + "</div></div>" +
+        '<div class="tile"><div class="k">Club total</div><div class="v">' + esc(dur(clubToday)) + '</div><div class="n">played today</div></div>' +
+        '<div class="tile"><div class="k">Busiest hour</div><div class="v">' + (A.days ? esc(hourLabel(A.peakH)) : "—") + '</div><div class="n">' + (A.days ? "avg " + A.byHour[A.peakH].toFixed(1) + " online" : "needs data") + "</div></div>" +
+      "</div>";
+    // Timeline for the chosen day
+    const d0 = dayStart(S.actDay), d1 = S.actDay ? dayStart(S.actDay - 1) : d0 + DAY;
+    const isToday = S.actDay === 0;
+    const dayPick = '<div class="days" role="group" aria-label="Day">' + [6, 5, 4, 3, 2, 1, 0].map((b) => { const d = new Date(dayStart(b));
+      return '<button data-seg="actDay" data-v="' + b + '" aria-pressed="' + (S.actDay === b) + '" aria-label="' + esc(d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })) + '"><span>' + (b === 0 ? "Today" : WD[d.getDay()]) + "</span><b>" + d.getDate() + "</b></button>"; }).join("") + "</div>";
+    const rows = A.members.map((m) => ({ m, p: playIn(A.by.get(m.tag), d0, Math.min(d1, now)) }));
+    const active = rows.filter((r) => r.p.k > 0).sort((a, b) => b.p.ms - a.p.ms || a.m.name.localeCompare(b.m.name));
+    const idle = rows.filter((r) => r.p.k === 0);
+    const pctX = (t) => ((t - d0) / (d1 - d0)) * 100;
+    const nowPct = isToday ? pctX(now) : null;
+    const usual = (tag) => usualHours(A.by.get(tag), A.from, now);
+    const timeRow = ({ m, p }) => {
+      const sess = (A.by.get(m.tag) || []).filter((x) => x.e > d0 && x.s < d1);
+      const open = S.actOpen === m.tag, isOn = A.online.includes(m);
+      const blocks = sess.map((x) => {
+        const l = Math.max(0, pctX(x.s)), r = Math.min(100, pctX(x.e)), live = isOn && x === sess[sess.length - 1] && isToday;
+        return '<i class="blk' + (live ? " live" : "") + '" style="left:' + l.toFixed(2) + "%;width:" + Math.max(0.6, r - l).toFixed(2) + '%"></i>';
+      }).join("");
+      const detail = open
+        ? '<div class="adetail"><div class="sess">' + sess.map((x) => '<div><span>' + esc(tShort(x.s)) + " – " + esc(tShort(x.e)) + " · " + esc(dur(x.e - x.s)) + "</span><span>" + x.n + (x.n === 1 ? " battle" : " battles") + (x.tc ? " · " + sgn(x.tc) : "") + (modeTop(x.modes) ? " · " + esc(modeTop(x.modes)) : "") + "</span></div>").join("") + "</div>" +
+            '<div><div class="k-label" style="margin-bottom:6px">Usually plays · last ' + Math.min(14, A.days) + (A.days === 1 ? " day" : " days") + '</div><div class="strip">' + usual(m.tag).map((v) => '<i style="--a:' + (v ? (0.15 + v * 0.85).toFixed(2) : 0) + '"></i>').join("") + "</div>" +
+            '<div class="axis"><span style="left:0">12 AM</span><span style="left:25%">6 AM</span><span style="left:50%">12 PM</span><span style="left:75%">6 PM</span><span style="left:100%">12 AM</span></div></div>' +
+            '<div class="sub">' + (isOn ? "Playing now." : A.lastEnd(m.tag) ? "Last battle " + esc(ago(A.lastEnd(m.tag))) + "." : "") + " This week: " + esc(dur(playIn(A.by.get(m.tag), now - 7 * DAY, now).ms)) + " across " + playIn(A.by.get(m.tag), now - 7 * DAY, now).k + " sessions.</div></div>"
+        : "";
+      return '<button class="arow" data-act-m="' + esc(m.tag) + '" aria-expanded="' + open + '">' + avatar(m) +
+        '<span class="nm">' + (isOn ? '<span class="pulse"></span>' : "") + "<b>" + esc(m.name) + "</b>" + (m.tag === ME ? '<span class="you">YOU</span>' : "") + "</span>" +
+        '<span class="tot">' + esc(dur(p.ms)) + "<small>" + p.n + (p.n === 1 ? " battle" : " battles") + "</small></span>" +
+        '<span class="track' + (S.drawAnim ? " grow" : "") + '">' + blocks + (nowPct != null ? '<i class="now" style="left:' + nowPct.toFixed(2) + '%"></i>' : "") + "</span></button>" + detail;
+    };
+    const timeline =
+      '<div class="card" id="act-timeline"><h2>24-hour timeline<span class="sp"></span><span class="aside">' + esc(dShort(d0)) + "</span></h2>" +
+        dayPick +
+        '<div class="axis"><span style="left:0">12 AM</span><span style="left:25%">6 AM</span><span style="left:50%">12 PM</span><span style="left:75%">6 PM</span><span style="left:100%">12 AM</span></div>' +
+        (active.length ? '<div class="list">' + active.map(timeRow).join("") + "</div>" : '<div class="chart-empty" style="min-height:90px">No battles ' + (isToday ? "yet today" : "on this day") + ".</div>") +
+        (A.first && d0 < A.first ? '<div class="sub mt">Tracking started ' + esc(dtShort(A.first)) + ". Earlier times only include each member's last 25 battles, so they may be incomplete.</div>" : "") +
+        (idle.length ? '<div class="sub mt">Not seen ' + (isToday ? "today" : "this day") + ": " + idle.map((r) => esc(r.m.name)).join(", ") + ".</div>" : "") +
+        '<div class="sub mt">Tap a member for their sessions and usual hours. Times are in your phone\'s time zone.</div>' +
+      "</div>";
+    // Club rhythm heatmap
+    const maxAvg = Math.max(0.0001, ...A.avg.flat());
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const heat =
+      '<div class="card" id="act-rhythm"><h2>Club rhythm<span class="sp"></span><span class="aside">' + (A.days >= 14 ? "last 14 days" : A.days + (A.days === 1 ? " day so far" : " days so far")) + "</span></h2>" +
+        '<div class="heat">' + order.map((wd) => "<b>" + WD[wd] + "</b>" + A.avg[wd].map((v, h) => '<i title="' + WD[wd] + " " + hourLabel(h) + ": " + v.toFixed(1) + ' online"' + (A.peakCell && A.peakCell[0] === wd && A.peakCell[1] === h && v > 0 ? ' class="peak"' : "") + ' style="--a:' + (v ? (0.12 + (v / maxAvg) * 0.88).toFixed(2) : 0) + '"></i>').join("")).join("") + "</div>" +
+        '<div class="heat-x"><span></span><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span></div>' +
+        '<div class="row mt" style="justify-content:space-between"><span class="sub">' + (A.peakCell && A.avg[A.peakCell[0]][A.peakCell[1]] > 0 ? "Busiest: " + WD[A.peakCell[0]] + " around " + esc(hourLabel(A.peakCell[1])) + " (" + A.avg[A.peakCell[0]][A.peakCell[1]].toFixed(1) + " online on average)." : "Not enough activity yet.") + "</span>" +
+          '<span class="legend-ramp">fewer<i></i>more</span></div>' +
+        (A.days < 7 ? '<div class="sub mt">Each square is the average number of members playing in that hour. It fills in over the next two weeks.</div>' : "") +
+      "</div>";
+    // Most active this week
+    const week = A.members.map((m) => ({ m, p: playIn(A.by.get(m.tag), now - 7 * DAY, now) })).filter((r) => r.p.k > 0).sort((a, b) => b.p.ms - a.p.ms);
+    const maxW = Math.max(1, ...week.map((r) => r.p.ms));
+    const leaders =
+      '<div class="card" id="act-leaders"><h2>Most active · 7D</h2>' +
+        (week.length ? '<div class="list">' + week.slice(0, 10).map((r) => '<div class="barrow">' + avatar(r.m) + '<div style="min-width:0"><div class="nm">' + esc(r.m.name) + (r.m.tag === ME ? '<span class="you">YOU</span>' : "") + '</div><div class="bar"><i style="width:' + ((r.p.ms / maxW) * 100).toFixed(1) + '%"></i></div></div>' +
+            '<div class="end">' + esc(dur(r.p.ms)) + "<small>" + r.p.n + " battles</small></div></div>").join("") + "</div>"
+          : '<div class="sub">No sessions in the last 7 days yet.</div>') +
+      "</div>";
+    return nowCard + tiles + timeline + heat + leaders;
   }
 
   // ---------- notifications ----------
@@ -1249,7 +1482,7 @@ button:active { transform: scale(0.97); }
   }
 
   // ---------- render ----------
-  const RENDER = { me: renderMe, club: renderClub, brawlers: renderBrawlers, goals: renderGoals };
+  const RENDER = { me: renderMe, club: renderClub, activity: renderActivity, brawlers: renderBrawlers, goals: renderGoals };
   function render() {
     if (!S.loaded) return;
     derive();
@@ -1276,7 +1509,7 @@ button:active { transform: scale(0.97); }
     layoutColumns(sec, S.tab);
     // Motion: panels rise in when you switch tabs; charts draw in when the tab, range or chart type changes.
     const still = REDUCED();
-    const sig = [S.tab, S.r.me, S.r.club, S.chartMode].join("|");
+    const sig = [S.tab, S.r.me, S.r.club, S.chartMode, S.actDay].join("|");
     S.drawAnim = !still && sig !== render.sig;
     render.sig = sig;
     if (!still && S.tab !== render.tab) enterItems(sec);
@@ -1318,7 +1551,7 @@ button:active { transform: scale(0.97); }
     if (t.dataset.go) { S.tab = t.dataset.go; try { localStorage.setItem("tab", S.tab); } catch (e) {} render(); window.scrollTo({ top: 0 }); return; }
     if (t.dataset.seg) {
       const g = t.dataset.seg, v = t.dataset.v;
-      if (g in S.r) S.r[g] = v; else if (g === "bType") S.bType = v; else if (g === "brSort") S.brSort = v; else if (g === "memSort") S.memSort = v; else if (g === "chart") S.chartMode = v;
+      if (g in S.r) S.r[g] = v; else if (g === "bType") S.bType = v; else if (g === "brSort") S.brSort = v; else if (g === "memSort") S.memSort = v; else if (g === "chart") S.chartMode = v; else if (g === "actDay") { S.actDay = +v; S.actOpen = null; }
       if (g === "me" || g === "chart") { try { localStorage.setItem("prefs", JSON.stringify({ range: S.r.me, chart: S.chartMode })); } catch (e) {} }
       render(); return;
     }
@@ -1329,6 +1562,7 @@ button:active { transform: scale(0.97); }
       if (el) el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
       return;
     }
+    if (t.dataset.actM) { S.actOpen = S.actOpen === t.dataset.actM ? null : t.dataset.actM; render(); return; }
     if (t.dataset.br) { S.openBrawler = S.openBrawler === t.dataset.br ? null : t.dataset.br; render(); return; }
     if (t.id === "refreshBtn" || t.dataset.act === "retry" || t.dataset.act === "allow") { refreshLive(); return; }
     if (t.dataset.act === "maps") { S.showAllMaps = !S.showAllMaps; render(); return; }
@@ -1417,7 +1651,7 @@ button:active { transform: scale(0.97); }
     try { S.ownerCode = localStorage.getItem("ownerCode") || null; } catch (e) {}
     const cached = await cacheGet();
     if (cached && cached.v === CACHE_V && Array.isArray(cached.readings) && cached.readings.length) {
-      S.readings = cached.readings; S.battleRows = cached.battleRows || []; S.goals = cached.goals || [];
+      S.readings = cached.readings; S.battleRows = cached.battleRows || []; S.goals = cached.goals || []; S.sessions = cached.sessions || [];
       S.ver++; S.loaded = true; render();
     }
     try { await loadData(!S.readings.length); }

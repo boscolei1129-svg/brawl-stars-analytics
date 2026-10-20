@@ -15,6 +15,9 @@ const CLUB = "2U0RP22G2";
 const MIN_GAP_MS = 60_000; // refreshes closer together than this reuse the last reading
 const TZ = "Asia/Shanghai"; // "today" for the nightly recap
 const STEP_ME = 500, STEP_CLUB = 5000; // milestone sizes for notifications
+const GAP_MS = 20 * 60_000; // battles closer together than this are one play session
+const BATTLE_MS = 3 * 60_000; // a session starts about one battle before its first battle ends
+const ACTIVITY_EVERY_MS = 4 * 60_000; // read members' battle logs at most this often
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -265,7 +268,13 @@ async function refresh(src: string) {
     const change = clubChange(prevClub, club);
     if (change) { if (change.d) row.club_upd = change; else row.club = change; newClub = club; }
   }
+  let activity: unknown = null;
+  if (cr.status === "fulfilled") {
+    try { activity = await trackActivity((newClub ?? prevClub)?.members?.map((m: any[]) => m[0]) ?? []); }
+    catch (e) { activity = { error: String((e as Error)?.message ?? e) }; }
+  }
   const result = {
+    activity,
     ok: true, ts: now, trophies: (row.trophies as number) ?? null, club_trophies: (row.club_trophies as number) ?? null,
     battles_seen: saved, stored_brawlers: "brawlers" in row, stored_club: "club" in row ? "full" : "club_upd" in row ? "update" : false,
     club_source: cr.status === "fulfilled" ? cr.value.src : null, club_live_members: live, club_patched: patched,
@@ -303,6 +312,73 @@ async function refresh(src: string) {
     console.error("notifications failed", String((e as Error)?.message ?? e));
   }
   return { ...result, notified };
+}
+
+// ---------- member activity ----------
+// Official battle log times look like 20261020T031519.000Z.
+function battleTime(s: unknown) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(String(s ?? ""));
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : NaN;
+}
+// Adds new battles from members' battle logs to their play sessions. A battle within GAP_MS of the
+// member's latest session extends it; otherwise it starts a new one.
+function mergeBattles(prev: any | null, battles: { t: number; tc: number; mode: string | null }[]) {
+  const seen = prev ? ms(prev.ended_at) : 0;
+  const fresh = battles.filter((b) => b.t > seen).sort((a, b) => a.t - b.t);
+  const out: any[] = [];
+  let cur: any = prev ? { id: prev.id, tag: prev.tag, started_at: prev.started_at, ended_at: prev.ended_at, battles: prev.battles, tc: prev.tc, modes: { ...(prev.modes ?? {}) }, dirty: false } : null;
+  for (const b of fresh) {
+    if (cur && b.t - ms(cur.ended_at) <= GAP_MS) {
+      cur.ended_at = new Date(b.t).toISOString();
+      cur.battles += 1;
+      cur.tc += b.tc || 0;
+      if (b.mode) cur.modes[b.mode] = (cur.modes[b.mode] ?? 0) + 1;
+      cur.dirty = true;
+    } else {
+      if (cur?.dirty) out.push(cur);
+      cur = { tag: prev?.tag, started_at: new Date(Math.max(b.t - BATTLE_MS, seen)).toISOString(), ended_at: new Date(b.t).toISOString(),
+        battles: 1, tc: b.tc || 0, modes: b.mode ? { [b.mode]: 1 } : {}, dirty: true };
+    }
+  }
+  if (cur?.dirty) out.push(cur);
+  return out.map(({ dirty: _d, ...r }) => r);
+}
+async function trackActivity(tags: string[]) {
+  if (!Deno.env.get("BS_API_KEY") || !tags.length) return null;
+  const at = Number(await getSetting("activity_at")) || 0;
+  if (Date.now() - at < ACTIVITY_EVERY_MS) return { skipped: true };
+  await setSetting("activity_at", String(Date.now()));
+  const { data: latest, error } = await sb.from("latest_sessions").select("*").in("tag", tags);
+  if (error) throw error;
+  const last = new Map((latest ?? []).map((r: any) => [r.tag, r]));
+  const queue = tags.slice(), inserts: any[] = [], updates: any[] = [];
+  let read = 0, battles = 0;
+  const getLog = (tag: string) => officialGet(`/players/${encodeURIComponent("#" + tag)}/battlelog`);
+  const worker = async () => {
+    for (let tag = queue.shift(); tag; tag = queue.shift()) {
+      let log: any = null;
+      try { log = await getLog(tag); } catch (_e) {
+        await new Promise((r) => setTimeout(r, 400));
+        try { log = await getLog(tag); } catch (_e2) { log = null; }
+      }
+      if (!log?.items) continue;
+      read++;
+      const items = log.items.map((x: any) => ({ t: battleTime(x.battleTime), tc: x.battle?.trophyChange ?? 0, mode: x.event?.mode ?? x.battle?.mode ?? null }))
+        .filter((b: any) => !isNaN(b.t));
+      const prev = last.get(tag) ?? { tag, ended_at: null };
+      const rows = mergeBattles(last.has(tag) ? prev : null, items).map((r) => ({ ...r, tag }));
+      battles += items.filter((b: any) => b.t > (last.has(tag) ? ms(prev.ended_at) : 0)).length;
+      for (const r of rows) (r.id ? updates : inserts).push({ ...r, updated_at: new Date().toISOString() });
+    }
+  };
+  await Promise.all(Array.from({ length: 5 }, worker));
+  if (inserts.length) { const { error: e } = await sb.from("sessions").insert(inserts); if (e) throw e; }
+  for (const u of updates) {
+    const { id, ...rest } = u;
+    const { error: e } = await sb.from("sessions").update(rest).eq("id", id);
+    if (e) throw e;
+  }
+  return { members: read, battles, new_sessions: inserts.length, extended: updates.length };
 }
 
 // ---------- notifications ----------

@@ -4,7 +4,8 @@ A stats tracker for Brawl Stars players and their clubs. It shows trophy growth,
 
 ## How it works
 
-- **Home screen.** A phone opening the app for the first time sees the home screen: type a player tag, see the player (and their club) straight away, pick the club to follow (their own, another one, or none) and a code, and start tracking. After that the app opens straight to that player. Tap the player's name at the top to switch players or add another. Each phone keeps its own list of players; removing one only takes it off that phone.
+- **Welcome.** A phone opening the app for the first time sees "hello" written out in one stroke, then a four-step tour of what the app does and how player codes work. Open the app with `?welcome` at the end of the link to see it again; "How it works" on the home screen replays the tour.
+- **Home screen.** After the welcome, a new phone sees the home screen: type a player tag, see the player (and their club) straight away, pick the club to follow (their own, another one, or none) and a code, and start tracking. After that the app opens straight to that player. Tap the player's name at the top to switch players or add another. Each phone keeps its own list of players; removing one only takes it off that phone.
 - **Players.** Up to 20 players are tracked at once. A player nobody opens for 30 days pauses, and opening it again wakes it up. Anyone can view any tracked player (game stats are public), but each player's goals and alerts need that player's code, chosen when it was added. A player added with their own club follows them if they move to another.
 - **The page** (`index.html`) is a single static file served by GitHub Pages. It reads saved stats from Supabase with the public, read-only key.
 - **The server function** (`supabase/functions/brawl`) fetches fresh data from BrawlTime and saves a reading plus any new battles. The sync button calls it, and so does the app while it's open (every 3 minutes). It also adds and removes goals, but only for someone who knows that player's code.
@@ -46,5 +47,5 @@ update profile_codes set code_sha256 = encode(sha256(convert_to('NEWCODE', 'UTF8
 - Each player's trophy history starts when it was added (Oct 19, 2026 for #8YRJ090Q2). Club activity starts on Oct 20, 2026; days before that only include each member's last 25 battles.
 - Solo Showdown counts a top-5 finish as a win, as BrawlTime does.
 - A free Supabase project can pause after a week without activity. The cron job's calls should keep it awake. If it ever pauses, restore it from the Supabase dashboard.
-- Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`).
+- Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`). The welcome "hello" is traced from the letterforms of Dancing Script (SIL Open Font License).
 - Game art is loaded from Brawlify and BrawlTime. This app is unofficial and not endorsed by Supercell; see Supercell's Fan Content Policy.

@@ -7,6 +7,8 @@ A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Starga
 - **The page** (`index.html`) is a single static file served by GitHub Pages. It reads saved stats from Supabase with the public, read-only key.
 - **The server function** (`supabase/functions/brawl`) fetches fresh data from BrawlTime and saves a reading plus any new battles. The sync button calls it, and so does opening the app when the data is more than 10 minutes old. It also adds and removes goals, but only for someone who knows the owner code.
 - **The schedule.** A Supabase cron job calls the function every 15 minutes, so history builds up even when the app is closed.
+- **Opening fast.** The page, fonts and icons stay on your device (`sw.js`), and so do the stats it has already downloaded. The app opens instantly and then fetches only what's new. An update to the site shows up the second time you open it.
+- **Lean storage.** When a check finds nothing new, the server marks the last reading as confirmed instead of saving a copy. Brawler lists are saved as changes only.
 - **The database** (`supabase/schema.sql`) has four tables:
   - `readings`: one row per update.
   - `battles`: one row per battle, keyed by time.
@@ -35,3 +37,4 @@ update settings set value = encode(sha256(convert_to('NEWCODE', 'UTF8')), 'hex')
 - Trophy history starts on Oct 19, 2026, when tracking began.
 - Solo Showdown counts a top-5 finish as a win, as BrawlTime does.
 - A free Supabase project can pause after a week without activity. The cron job's calls should keep it awake. If it ever pauses, restore it from the Supabase dashboard.
+- Fonts: Chakra Petch and JetBrains Mono, both under the SIL Open Font License (see `fonts/`).

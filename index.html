@@ -568,7 +568,8 @@ section[data-tab] { display: grid; gap: 12px; }
     const clubSays = meRow ? meRow[3] : null, profileSays = D.P ? D.P.p.trophies : null;
     const stale = Date.now() - since > 2 * HOUR;
     const behind = stale && clubSays != null && profileSays != null && clubSays !== profileSays && D.P.ts >= D.C.ts - 5 * 60e3;
-    return { since, changed, checked: s[s.length - 1][0], clubSays, profileSays, behind, lag: behind || stale, source: "BrawlTime" };
+    const official = D.C.c.src === "official";
+    return { since, changed, checked: s[s.length - 1][0], clubSays, profileSays, behind, official, lag: behind || (!official && stale), source: official ? "the official Brawl Stars API" : "BrawlTime" };
   }
   function clubRows() {
     if (!D.C) return [];
@@ -904,8 +905,9 @@ section[data-tab] { display: grid; gap: 12px; }
           "<span>" + esc(c.type || "") + "</span><span>" + fmt(c.req) + "+ to join</span></div>" +
         (c.desc ? '<div class="sub mt">' + esc(c.desc) + "</div>" : "") +
         (fr
-          ? '<div class="asof' + (fr.lag ? " lag" : "") + '"><i></i><div><b>Club data as of ' + esc(fr.changed ? ago(fr.since) : dtShort(fr.since)) + "</b>" +
-              (fr.changed ? "Last changed " + esc(dtShort(fr.since)) + ". " : "Unchanged since tracking began. ") + "Checked " + esc(ago(fr.checked)) + " from " + fr.source + "." +
+          ? '<div class="asof' + (fr.lag ? " lag" : "") + '"><i></i><div><b>Checked ' + esc(ago(fr.checked)) + "</b>" +
+              (fr.changed ? "Club total last changed " + esc(ago(fr.since)) + " (" + esc(dtShort(fr.since)) + "). " : "Club total unchanged since tracking began. ") + "Source: " + fr.source + "." +
+              (fr.official ? "" : " BrawlTime can update club lists up to about an hour late, so other members' trophies may trail the game. Yours are filled in live.") +
               (fr.behind ? " The club list shows you at " + fmt(fr.clubSays) + " while your profile says " + fmt(fr.profileSays) + ", so the club feed is running behind. Member trophies here may be out of date." : "") +
             "</div></div>"
           : "") +
@@ -1175,7 +1177,7 @@ section[data-tab] { display: grid; gap: 12px; }
     }
     S.loaded = true;
     render();
-    const due = () => document.visibilityState === "visible" && !S.live.busy && Date.now() - Math.max(S.live.at, D ? D.lastTs : 0) > 10 * 60e3;
+    const due = () => document.visibilityState === "visible" && !S.live.busy && Date.now() - Math.max(S.live.at, D ? D.lastTs : 0) > 3 * 60e3; // while the app is open, check every few minutes
     if (due()) refreshLive();
     setInterval(() => { if (due()) refreshLive(); }, 60e3);
     document.addEventListener("visibilitychange", () => { if (due()) refreshLive(); });

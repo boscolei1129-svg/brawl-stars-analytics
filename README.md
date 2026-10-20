@@ -5,8 +5,9 @@ A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Starga
 ## How it works
 
 - **The page** (`index.html`) is a single static file served by GitHub Pages. It reads saved stats from Supabase with the public, read-only key.
-- **The server function** (`supabase/functions/brawl`) fetches fresh data from BrawlTime and saves a reading plus any new battles. The sync button calls it, and so does opening the app when the data is more than 10 minutes old. It also adds and removes goals, but only for someone who knows the owner code.
+- **The server function** (`supabase/functions/brawl`) fetches fresh data from BrawlTime and saves a reading plus any new battles. The sync button calls it, and so does the app while it's open (every 3 minutes). It also adds and removes goals, but only for someone who knows the owner code.
 - **The schedule.** A Supabase cron job calls the function every 15 minutes, so history builds up even when the app is closed.
+- **Club data.** BrawlTime only refreshes club lists now and then (up to about an hour late), so the function fills in your own live trophies. With an official Brawl Stars API key saved as the `BS_API_KEY` secret in Supabase, the club comes straight from Supercell through RoyaleAPI's proxy (`bsproxy.royaleapi.dev`; allow IP `45.79.218.79` on the key).
 - **Opening fast.** The page, fonts and icons stay on your device (`sw.js`), and so do the stats it has already downloaded. The app opens instantly and then fetches only what's new. An update to the site shows up the second time you open it.
 - **Lean storage.** When a check finds nothing new, the server marks the last reading as confirmed instead of saving a copy. Brawler lists are saved as changes only.
 - **The database** (`supabase/schema.sql`) has four tables:

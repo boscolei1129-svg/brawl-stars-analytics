@@ -1,5 +1,5 @@
 // Brawl Stars Analytics server function.
-//   POST {action:"refresh", src?:"auto"|"live"}  fetch BrawlTime, save a reading and new battles
+//   POST {action:"refresh", src?:"auto"|"live"}  fetch fresh stats, save a reading and new battles
 //   POST {action:"check_code", code}              confirm the owner code (unlocks goal editing)
 //   POST {action:"goal_add", code, kind, target, brawler?}
 //   POST {action:"goal_delete", code, id}
@@ -48,6 +48,33 @@ async function getFeedRetry(makeUrl: () => string) {
   }
 }
 
+// BrawlTime refreshes club lists only now and then (up to about an hour behind the game). With an official
+// Brawl Stars API key in the BS_API_KEY secret, the club comes straight from Supercell instead. Supercell keys
+// only work from fixed addresses, so requests go through RoyaleAPI's proxy (allow 45.79.218.79 on the key).
+async function getOfficialClub() {
+  const key = Deno.env.get("BS_API_KEY");
+  if (!key) return null;
+  const r = await fetch(`https://bsproxy.royaleapi.dev/v1/clubs/${encodeURIComponent("#" + CLUB)}`, {
+    headers: { Authorization: `Bearer ${key.trim()}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new Error(`Brawl Stars API answered ${r.status}`);
+  const d = await r.json();
+  if (!d || !Array.isArray(d.members)) throw new Error("Brawl Stars API returned no club");
+  return d;
+}
+
+async function getClub(): Promise<{ data: any; src: string; officialError: string | null }> {
+  let officialError: string | null = null;
+  try {
+    const d = await getOfficialClub();
+    if (d) return { data: d, src: "official", officialError };
+  } catch (e) {
+    officialError = String((e as Error)?.message ?? e);
+  }
+  return { data: await getFeedRetry(() => feed("club.byTag", CLUB)), src: "brawltime", officialError };
+}
+
 function compactPlayer(d: any) {
   const player = {
     name: d.name, tag: strip(d.tag), trophies: d.trophies, highest: d.highestTrophies,
@@ -71,11 +98,21 @@ function compactPlayer(d: any) {
   return { player, brawlers, battles };
 }
 
-function compactClub(c: any) {
+function compactClub(c: any, src: string) {
+  const members = (c.members ?? []).map((m: any) => [strip(m.tag), m.name, m.role, m.trophies]);
   return {
     name: c.name, tag: strip(c.tag), trophies: c.trophies, req: c.requiredTrophies, type: c.type, desc: c.description,
-    members: (c.members ?? []).map((m: any) => [strip(m.tag), m.name, m.role, m.trophies]),
+    members, src,
   };
+}
+
+// BrawlTime's club list lags; your own profile doesn't. Put your live trophies into your row and the total.
+function patchMyRow(club: any, myTrophies: number) {
+  const row = club.members.find((m: any[]) => m[0] === ME);
+  if (!row || typeof myTrophies !== "number" || row[3] === myTrophies) return false;
+  club.trophies += myTrophies - row[3];
+  row[3] = myTrophies;
+  return true;
 }
 
 // Key-order-independent JSON, so a list read back from the database (which reorders keys) compares equal.
@@ -90,8 +127,8 @@ function stable(v: unknown): string {
 const ms = (v: unknown) => (v ? new Date(String(v)).getTime() : 0);
 
 async function latest(column: "club") {
-  const { data, error } = await sb.from("readings").select(`${column}, nb, ts`).not(column, "is", null)
-    .order("nb", { ascending: false, nullsFirst: false }).order("ts", { ascending: false }).limit(1);
+  const { data, error } = await sb.from("readings").select(`${column}, ts`).not(column, "is", null)
+    .order("ts", { ascending: false }).order("id", { ascending: false }).limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }
@@ -127,7 +164,7 @@ async function refresh(src: string) {
   }
   const [pr, cr] = await Promise.allSettled([
     getFeedRetry(() => feed("player.byTag", ME)),
-    getFeedRetry(() => feed("club.byTag", CLUB)),
+    getClub(),
   ]);
   if (pr.status === "rejected" && cr.status === "rejected") throw new Error(String(pr.reason?.message ?? pr.reason));
 
@@ -155,8 +192,10 @@ async function refresh(src: string) {
       if (Object.keys(delta).length) { row.brawlers = delta; newFull = { ...full, ...delta }; }
     }
   }
+  let patched = false;
   if (cr.status === "fulfilled") {
-    const club = compactClub(cr.value);
+    const club = compactClub(cr.value.data, cr.value.src);
+    if (club.src === "brawltime" && typeof row.trophies === "number") patched = patchMyRow(club, row.trophies as number);
     row.club_trophies = club.trophies;
     const prev = await latest("club");
     if (!prev || stable(prev.club) !== stable(club)) row.club = club;
@@ -164,6 +203,8 @@ async function refresh(src: string) {
   const result = {
     ok: true, ts: now, trophies: (row.trophies as number) ?? null, club_trophies: (row.club_trophies as number) ?? null,
     battles_seen: saved, stored_brawlers: "brawlers" in row, stored_club: "club" in row,
+    club_source: cr.status === "fulfilled" ? cr.value.src : null, club_patched: patched,
+    official_error: cr.status === "fulfilled" ? cr.value.officialError : null,
     player_error: pr.status === "rejected" ? String(pr.reason?.message ?? pr.reason) : null,
     club_error: cr.status === "rejected" ? String(cr.reason?.message ?? cr.reason) : null,
   };

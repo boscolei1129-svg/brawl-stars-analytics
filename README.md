@@ -11,13 +11,14 @@ A personal stats tracker for player **#8YRJ090Q2** and club **#2U0RP22G2 (Starga
 - **Notifications.** On the Goals tab, after unlocking with the owner code, each device can turn on alerts: goals reached, trophy milestones (every 500 for you, every 5,000 for the club), members joining or leaving, and a nightly recap at 10 PM Shanghai time. On iPhone and iPad this works once the app is added to the Home Screen and opened from there. The server signs notifications with its own keys (made on first use, kept private in the database).
 - **Opening fast.** The page, fonts and icons stay on your device (`sw.js`), and so do the stats it has already downloaded. The app opens instantly and then fetches only what's new. An update to the site shows up the second time you open it.
 - **Lean storage.** When a check finds nothing new, the server marks the last reading as confirmed instead of saving a copy. Brawler lists are saved as changes only.
-- **The database** (`supabase/schema.sql`) has four tables:
+- **The database** (`supabase/schema.sql`) has five tables:
   - `readings`: one row per update.
   - `battles`: one row per battle, keyed by time.
   - `goals`.
-  - `settings`: private. It holds the owner-code hash and the current full brawler list.
+  - `settings`: private. It holds the owner-code hash, the current full brawler and club lists, and the push keys.
+  - `push_subs`: private. Devices that turned on notifications.
 
-  Anyone can read the first three. Only the function can write to any of them.
+  Anyone can read the first three. Only the function can write to any of them, or read the last two.
 
 ## Owner code
 

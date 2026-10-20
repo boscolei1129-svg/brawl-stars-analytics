@@ -1332,9 +1332,9 @@ button:active { transform: scale(0.97); }
       "</div>";
     const tiles =
       '<div class="tiles">' +
-        '<div class="tile"><div class="k">Played today</div><div class="v">' + playedToday.length + '</div><div class="n">of ' + A.members.length + "</div></div>" +
-        '<div class="tile"><div class="k">Club total</div><div class="v">' + esc(dur(clubToday)) + '</div><div class="n">played today</div></div>' +
-        '<div class="tile"><div class="k">Busiest hour</div><div class="v">' + (A.days ? esc(hourLabel(A.peakH)) : "—") + '</div><div class="n">' + (A.days ? "avg " + A.byHour[A.peakH].toFixed(1) + " online" : "needs data") + "</div></div>" +
+        '<div class="tile"><div class="k">Played</div><div class="v">' + playedToday.length + '</div><div class="n">of ' + A.members.length + " today</div></div>" +
+        '<div class="tile"><div class="k">Playtime</div><div class="v">' + esc(dur(clubToday)) + '</div><div class="n">club today</div></div>' +
+        '<div class="tile"><div class="k">Peak hour</div><div class="v">' + (A.days && A.byHour[A.peakH] > 0 ? esc(hourLabel(A.peakH)) : "—") + '</div><div class="n">' + (A.days && A.byHour[A.peakH] > 0 ? A.byHour[A.peakH].toFixed(1) + " on avg" : "needs data") + "</div></div>" +
       "</div>";
     // Timeline for the chosen day
     const d0 = dayStart(S.actDay), d1 = S.actDay ? dayStart(S.actDay - 1) : d0 + DAY;
@@ -1381,7 +1381,7 @@ button:active { transform: scale(0.97); }
       '<div class="card" id="act-rhythm"><h2>Club rhythm<span class="sp"></span><span class="aside">' + (A.days >= 14 ? "last 14 days" : A.days + (A.days === 1 ? " day so far" : " days so far")) + "</span></h2>" +
         '<div class="heat">' + order.map((wd) => "<b>" + WD[wd] + "</b>" + A.avg[wd].map((v, h) => '<i title="' + WD[wd] + " " + hourLabel(h) + ": " + v.toFixed(1) + ' online"' + (A.peakCell && A.peakCell[0] === wd && A.peakCell[1] === h && v > 0 ? ' class="peak"' : "") + ' style="--a:' + (v ? (0.12 + (v / maxAvg) * 0.88).toFixed(2) : 0) + '"></i>').join("")).join("") + "</div>" +
         '<div class="heat-x"><span></span><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span></div>' +
-        '<div class="row mt" style="justify-content:space-between"><span class="sub">' + (A.peakCell && A.avg[A.peakCell[0]][A.peakCell[1]] > 0 ? "Busiest: " + WD[A.peakCell[0]] + " around " + esc(hourLabel(A.peakCell[1])) + " (" + A.avg[A.peakCell[0]][A.peakCell[1]].toFixed(1) + " online on average)." : "Not enough activity yet.") + "</span>" +
+        '<div class="row mt" style="justify-content:space-between"><span class="sub">' + (A.peakCell && A.avg[A.peakCell[0]][A.peakCell[1]] > 0 ? "Busiest: " + WD[A.peakCell[0]] + " around " + esc(hourLabel(A.peakCell[1])) + " (" + A.avg[A.peakCell[0]][A.peakCell[1]].toFixed(1) + " online on average)." : "Not enough activity yet. Hours count from when tracking began.") + "</span>" +
           '<span class="legend-ramp">fewer<i></i>more</span></div>' +
         (A.days < 7 ? '<div class="sub mt">Each square is the average number of members playing in that hour. It fills in over the next two weeks.</div>' : "") +
       "</div>";
@@ -1393,6 +1393,7 @@ button:active { transform: scale(0.97); }
         (week.length ? '<div class="list">' + week.slice(0, 10).map((r) => '<div class="barrow">' + avatar(r.m) + '<div style="min-width:0"><div class="nm">' + esc(r.m.name) + (r.m.tag === ME ? '<span class="you">YOU</span>' : "") + '</div><div class="bar"><i style="width:' + ((r.p.ms / maxW) * 100).toFixed(1) + '%"></i></div></div>' +
             '<div class="end">' + esc(dur(r.p.ms)) + "<small>" + r.p.n + " battles</small></div></div>").join("") + "</div>"
           : '<div class="sub">No sessions in the last 7 days yet.</div>') +
+        (week.length && A.first && A.first > now - 7 * DAY ? '<div class="sub mt">Before ' + esc(dtShort(A.first)) + ", only each member's last 25 battles are counted.</div>" : "") +
       "</div>";
     return nowCard + tiles + timeline + heat + leaders;
   }

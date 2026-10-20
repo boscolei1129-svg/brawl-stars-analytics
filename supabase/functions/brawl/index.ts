@@ -77,19 +77,26 @@ async function getOfficialClub() {
 
 // Club member lists (Supercell's own included) can trail the game by up to about an hour, while each
 // player's profile is live. With a key, read every member's profile and rebuild the total from those.
-async function liveMembers(club: any): Promise<Set<string>> {
+// If a profile can't be read this time, the member keeps the last live number saved (when there is one),
+// so the club total doesn't dip back to the older club-list figure.
+async function liveMembers(club: any, prev: any): Promise<Set<string>> {
   const done = new Set<string>();
   if (!Deno.env.get("BS_API_KEY")) return done;
+  const prevTr = new Map((prev?.members ?? []).map((m: any[]) => [m[0], m[3]]));
   const queue = club.members.slice();
+  const read = (tag: string) => officialGet(`/players/${encodeURIComponent("#" + tag)}`);
   const worker = async () => {
     for (let m = queue.shift(); m; m = queue.shift()) {
-      try {
-        const p = await officialGet(`/players/${encodeURIComponent("#" + m[0])}`);
-        if (p && typeof p.trophies === "number") { m[3] = p.trophies; if (p.icon?.id) m[4] = p.icon.id; done.add(m[0]); }
-      } catch (_e) { /* keep the club list's number for this member */ }
+      let p: any = null;
+      try { p = await read(m[0]); } catch (_e) {
+        await new Promise((r) => setTimeout(r, 400));
+        try { p = await read(m[0]); } catch (_e2) { p = null; }
+      }
+      if (p && typeof p.trophies === "number") { m[3] = p.trophies; if (p.icon?.id) m[4] = p.icon.id; done.add(m[0]); }
+      else if (prevTr.has(m[0]) && prev?.src === "official") m[3] = prevTr.get(m[0]);
     }
   };
-  await Promise.all(Array.from({ length: 8 }, worker));
+  await Promise.all(Array.from({ length: 5 }, worker));
   if (done.size) club.trophies = club.members.reduce((sum: number, m: any[]) => sum + (Number(m[3]) || 0), 0);
   return done;
 }
@@ -250,11 +257,11 @@ async function refresh(src: string) {
   let patched = false, live = 0, newClub: any = null, prevClub: any = null;
   if (cr.status === "fulfilled") {
     const club = compactClub(cr.value.data, cr.value.src);
-    const fresh = await liveMembers(club);
+    prevClub = await clubFull();
+    const fresh = await liveMembers(club, prevClub);
     live = fresh.size;
     if (!fresh.has(ME) && typeof row.trophies === "number") patched = patchMyRow(club, row.trophies as number);
     row.club_trophies = club.trophies;
-    prevClub = await clubFull();
     const change = clubChange(prevClub, club);
     if (change) { if (change.d) row.club_upd = change; else row.club = change; newClub = club; }
   }

@@ -132,14 +132,14 @@ function api() {
     db.T.profiles.push({ tag: "8YRJ090Q2", active: true, keep: true });
     db.T.readings.push({ id: 1, tag: "8YRJ090Q2", ts: new Date().toISOString(), trophies: 1, player: { trophies: 1 } });
     const D = dev();
-    await call({ action: "goal_add", tag: "8YRJ090Q2", device: D, kind: "player", target: 4 }, freshIp()); // this phone is known
+    await call({ action: "goal_add", tag: "8YRJ090Q2", device: D, kind: "player", target: 4 }, freshIp()); // this device is known
     db.fail.rate_hit = true;
     const ex = await call({ action: "explore_player", tag: "2PPLYQ2C" }, freshIp());
     ok("counter down: Explore lookups are refused (they cost API calls)", ex.status === 429 && A.calls.player === 0, ex);
     const add = await call({ action: "profile_add", tag: "2PPLYQ2C", device: dev() }, freshIp());
     ok("counter down: adding players is refused", add.status === 429 && db.T.profiles.length === 1, add);
     const g = await call({ action: "goal_add", tag: "8YRJ090Q2", device: D, kind: "player", target: 5 }, freshIp());
-    ok("counter down: goals still work on a known phone (no API cost)", g.ok, g);
+    ok("counter down: goals still work on a known device (no API cost)", g.ok, g);
     ok("counter failures are counted", db.T.usage_counters.some((x) => x.key === "limit_error:closed") && db.T.usage_counters.some((x) => x.key === "limit_error:open"));
   }
   // ---- two adds at the same moment can't both take the last spot ----
@@ -153,11 +153,11 @@ function api() {
       call({ action: "profile_add", tag: "2PPLYQ2C", device: D1 }, freshIp()),
       call({ action: "profile_add", tag: "9GQRUJ2Y", device: D2 }, freshIp()),
     ]);
-    ok("two phones racing for the last spot: one gets it, the other is told it's full", db.T.profiles.filter((p) => p.active).length === 50 && [a, b].filter((x) => x.created).length === 1 && [a, b].filter((x) => x.error === "full").length === 1, [a.error || a.created, b.error || b.created]);
+    ok("two devices racing for the last spot: one gets it, the other is told it's full", db.T.profiles.filter((p) => p.active).length === 50 && [a, b].filter((x) => x.created).length === 1 && [a, b].filter((x) => x.error === "full").length === 1, [a.error || a.created, b.error || b.created]);
     const D3 = dev();
     const { db: dbP, call: callP } = load(FILE, { fetch: A.fetch });
     const [x, y, z] = await Promise.all(["2PPLYQ2C", "9GQRUJ2Y", "8QJ0P2LG"].map((t) => callP({ action: "profile_add", tag: t, device: D3 }, freshIp())));
-    ok("one phone adding 3 at once ends up with 2", dbP.T.profile_adders.length === 2 && [x, y, z].filter((r) => r.error === "phone_full").length === 1 && [x, y, z].filter((r) => r.created).length === 2, [x, y, z].map((r) => r.error || r.created));
+    ok("one device adding 3 at once ends up with 2", dbP.T.profile_adders.length === 2 && [x, y, z].filter((r) => r.error === "phone_full").length === 1 && [x, y, z].filter((r) => r.created).length === 2, [x, y, z].map((r) => r.error || r.created));
   }
   console.log(fails ? `${fails} of ${n} FAILED` : `all ${n} passed`);
   process.exit(fails ? 1 : 0);

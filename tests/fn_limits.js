@@ -1,4 +1,4 @@
-// Player limits (50 in the app, 2 started per phone, releasing, pausing) and the thinning of old readings,
+// Player limits (50 in the app, 2 started per device, releasing, pausing) and the thinning of old readings,
 // run against the real server code (fn_harness.js).
 // node fn_limits.js ../standalone/supabase/functions/brawl/index.ts
 const { load } = require("./fn_harness");
@@ -19,20 +19,20 @@ async function limits() {
   const active = (tag) => db.T.profiles.find((p) => p.tag === tag)?.active;
 
   ok("adding without a device is refused", (await call({ action: "profile_add", tag: TAGS[0] })).status === 401);
-  ok("phone A starts player 1", (await add(A, TAGS[0])).created === true);
-  ok("phone A starts player 2", (await add(A, TAGS[1])).created === true);
+  ok("device A starts player 1", (await add(A, TAGS[0])).created === true);
+  ok("device A starts player 2", (await add(A, TAGS[1])).created === true);
   const third = await add(A, TAGS[2]);
-  ok("phone A's third new player is refused (phone_full)", third.status === 409 && third.error === "phone_full", third);
+  ok("device A's third new player is refused (phone_full)", third.status === 409 && third.error === "phone_full", third);
   ok("...and the answer names the 2 it holds", JSON.stringify((third.held || []).sort()) === JSON.stringify([TAGS[0], TAGS[1]].sort()), third.held);
   ok("...and nothing was created", !db.T.profiles.some((p) => p.tag === TAGS[2]));
-  ok("phone A can still save a player someone else tracks", (await add(A, "8YRJ090Q2")).exists === true);
+  ok("device A can still save a player someone else tracks", (await add(A, "8YRJ090Q2")).exists === true);
   const bSave = await add(B, TAGS[0]);
-  ok("phone B saving A's player doesn't use B's spots", bSave.exists === true && !db.T.profile_adders.some((r) => r.tag === TAGS[0] && r.owner !== db.T.profile_adders[0].owner));
+  ok("device B saving A's player doesn't use B's spots", bSave.exists === true && !db.T.profile_adders.some((r) => r.tag === TAGS[0] && r.owner !== db.T.profile_adders[0].owner));
 
-  // Linked phones share one owner, so they share the 2 spots.
+  // Linked devices share one owner, so they share the 2 spots.
   const ownerA = db.T.device_keys[0].owner, A2 = dev();
   db.T.device_keys.push({ key_hash: crypto.createHash("sha256").update("device:" + A2).digest("hex"), owner: ownerA, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString() });
-  ok("a phone linked to A shares A's limit", (await add(A2, TAGS[2])).error === "phone_full");
+  ok("a device linked to A shares A's limit", (await add(A2, TAGS[2])).error === "phone_full");
 
   ok("releasing a player A didn't start does nothing", (await rel(A, "8YRJ090Q2")).released === false && active("8YRJ090Q2") === true);
   const r1 = await rel(A, TAGS[0]);
@@ -44,11 +44,11 @@ async function limits() {
   await call({ action: "refresh", tag: TAGS[0], src: "live", device: B }, freshIp());
   ok("opening paused player 1 wakes it (room in the app)", active(TAGS[0]) === true);
 
-  // A paused player started again through the add form counts as that phone's.
+  // A paused player started again through the add form counts as that device's.
   await rel(A, TAGS[1]);
   ok("player 2 paused after release", active(TAGS[1]) === false);
   const cWake = await add(C, TAGS[1]);
-  ok("phone C re-adding paused player 2 wakes it and holds it", cWake.exists && active(TAGS[1]) === true && db.T.profile_adders.some((r) => r.tag === TAGS[1]), cWake);
+  ok("device C re-adding paused player 2 wakes it and holds it", cWake.exists && active(TAGS[1]) === true && db.T.profile_adders.some((r) => r.tag === TAGS[1]), cWake);
   ok("a kept profile never pauses on release", (await rel(C, "8YRJ090Q2")).released === false && active("8YRJ090Q2"));
 
   // The app-wide cap.

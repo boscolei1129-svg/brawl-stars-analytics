@@ -413,7 +413,7 @@ section[data-tab] { display: grid; gap: 12px; }
 .whobtn:hover .swap { stroke: var(--fg); }
 .whobtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
-/* Home: players saved on this phone, and adding one */
+/* Home: players saved on this device, and adding one */
 html.homeopen, html.homeopen body { overflow: hidden; }
 .home { position: fixed; inset: 0; z-index: 100; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; animation: homein 0.24s ease-out both; }
 .home.leaving { opacity: 0; transition: opacity 0.16s ease-in; }
@@ -1059,7 +1059,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     }
     return out;
   }
-  // This phone's own secret, made here and never shown. Goals and alerts belong to it (and to phones linked to it
+  // This device's own secret, made here and never shown. Goals and alerts belong to it (and to devices linked to it
   // with a one-time code), so nobody else can see or change them. No account needed.
   function deviceKey() {
     let d = lsGet("device");
@@ -1082,7 +1082,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     }
     return j;
   }
-  // Goals are private to this phone, so they come from the server function, not the public tables. If that fails,
+  // Goals are private to this device, so they come from the server function, not the public tables. If that fails,
   // the goals already on screen stay.
   const myGoals = () => callFn({ action: "goals_list" }).then((r) => r.goals || [])
     .catch(() => S.goals.map((g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created_at: new Date(g.created || 0).toISOString() })));
@@ -1671,13 +1671,13 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     if (C) suggestions.push({ kind: "club", target: Math.ceil((C.c.trophies + 1) / 25000) * 25000 });
     if (P && P.p.elo) suggestions.push({ kind: "elo", target: Math.ceil((P.p.elo + 1) / 250) * 250 });
     const sugg = suggestions.filter((s) => !S.goals.some((g) => g.kind === s.kind && g.target === s.target));
-    const locked = false; // goals belong to this phone
+    const locked = false; // goals belong to this device
     const lock = locked
       ? '<div class="card"><h2>Unlock goal editing</h2><form id="codeForm" class="row" novalidate><input class="input" id="ownerCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code" aria-label="Player code" style="flex:1;min-width:140px"><button class="btn" type="submit">Unlock</button></form>' +
-        '<div class="sub mt" id="codeMsg">Anyone can see these goals. To add or remove them, enter the code chosen when this player was added. This phone remembers it.</div></div>'
+        '<div class="sub mt" id="codeMsg">Anyone can see these goals. To add or remove them, enter the code chosen when this player was added. This device remembers it.</div></div>'
       : "";
     const form =
-      '<div class="card cut"><h2>New goal<span class="sp"></span>' + '<span class="aside priv"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/></svg>Only on this phone</span>' + "</h2>" +
+      '<div class="card cut"><h2>New goal<span class="sp"></span>' + '<span class="aside priv"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/></svg>Only on this device</span>' + "</h2>" +
         '<form id="goalForm" class="form" novalidate>' +
           '<div class="field"><label for="gKind">Track</label><select class="input" id="gKind">' +
             [["player", "My trophies"], ["club", "Club trophies"], ["brawler", "A brawler"], ["elo", "Ranked Elo"]].map(([v, l]) => '<option value="' + v + '"' + (S.goalKind === v ? " selected" : "") + ">" + l + "</option>").join("") +
@@ -1922,7 +1922,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         (active.length ? '<div class="list">' + active.map(timeRow).join("") + "</div>" : '<div class="chart-empty" style="min-height:90px">No battles ' + (isToday ? "yet today" : "on this day") + ".</div>") +
         (A.first && d0 < A.first ? '<div class="sub mt">Tracking started ' + esc(dtShort(A.first)) + ". Earlier times only include each member's last 25 battles, so they may be incomplete.</div>" : "") +
         (idle.length ? '<div class="sub mt">Not seen ' + (isToday ? "today" : "this day") + ": " + idle.map((r) => esc(r.m.name)).join(", ") + ".</div>" : "") +
-        '<div class="sub mt">Tap a member for their sessions and usual hours. Times are in your phone\'s time zone.</div>' +
+        '<div class="sub mt">Tap a member for their sessions and usual hours. Times are in your device\'s time zone.</div>' +
       "</div>";
     // Club rhythm heatmap
     const maxAvg = Math.max(0.0001, ...A.avg.flat());
@@ -2021,7 +2021,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       await callFn({ action: "push_subscribe", sub: sub.toJSON(), prefs: pushPrefsOut() });
       P.endpoint = sub.endpoint;
       lsSet("pushOn:" + ME, "1");
-      P.msg = "Notifications are on for this player on this phone. Send a test to check.";
+      P.msg = "Notifications are on for this player on this device. Send a test to check.";
     } catch (e) {
       P.msg = "Couldn't turn on notifications: " + String((e && e.message) || e).slice(0, 120);
     } finally { P.busy = false; render(); }
@@ -2036,10 +2036,10 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       if (sub) {
         await callFn({ action: "push_unsubscribe", endpoint: sub.endpoint }).catch(() => {});
         lsSet("pushOn:" + ME, null);
-        // Other players on this phone may still use the same subscription.
+        // Other players on this device may still use the same subscription.
         if (!PROFILES.list().some((p) => p.tag !== ME && lsGet("pushOn:" + p.tag))) await sub.unsubscribe();
       }
-      P.endpoint = null; P.msg = "Notifications are off for this player on this phone.";
+      P.endpoint = null; P.msg = "Notifications are off for this player on this device.";
     } catch (e) { P.msg = "Couldn't turn notifications off: " + String((e && e.message) || e).slice(0, 120); }
     finally { P.busy = false; render(); }
   }
@@ -2074,28 +2074,28 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     }
   }
 
-  // ---------- your phones ----------
-  // Goals and alerts live with this phone. A one-time 6-digit code lets another phone share them. On iPhone the
-  // Home Screen app keeps its own storage, so it counts as another phone too.
+  // ---------- your devices ----------
+  // Goals and alerts live with this device. A one-time 6-digit code lets another device share them. On iPhone the
+  // Home Screen app keeps its own storage, so it counts as another device too.
   function linkCard() {
     const L = S.link;
     let inner;
     if (L.code && L.until > Date.now()) {
       inner = '<div class="lcode" aria-label="Code ' + L.code.split("").join(" ") + '"><span>' + L.code.slice(0, 3) + "</span><span>" + L.code.slice(3) + "</span></div>" +
-        '<div class="sub">On the other phone, open any player\'s Goals tab, tap <b>I have a code</b> and type this in. It works once, until ' +
+        '<div class="sub">On the other device, open any player\'s Goals tab, tap <b>I have a code</b> and type this in. It works once, until ' +
           esc(new Date(L.until).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })) + ".</div>" +
         '<div class="row mt"><button class="btn ghost" data-link="hide">Done</button></div>';
     } else if (L.enter) {
       inner = '<form id="linkForm" class="row" novalidate><input class="input code-in" id="linkIn" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123 456" aria-label="6-digit code" value="' + esc(L.val || "") + '" style="flex:1;min-width:140px"' + (L.busy ? " disabled" : "") + '>' +
           '<button class="btn" type="submit"' + (L.busy ? " disabled" : "") + ">" + (L.busy ? "Linking…" : "Link") + "</button></form>" +
-        '<div class="sub mt">Type the code showing on your other phone. This phone will then share its goals and alerts, and keep any it already has.</div>' +
+        '<div class="sub mt">Type the code showing on your other device. This device will then share its goals and alerts, and keep any it already has.</div>' +
         '<div class="row mt"><button class="link" data-link="cancel">Cancel</button></div>';
     } else {
-      inner = '<div class="sub">Your goals and alert settings are saved privately for this phone. No account or password, and nobody else can see or change them.</div>' +
-        '<div class="row mt"><button class="btn ghost" data-link="make"' + (L.busy ? " disabled" : "") + ">" + (L.busy ? "Making a code…" : "Use on another phone") + '</button><button class="link" data-link="enter">I have a code</button></div>' +
+      inner = '<div class="sub">Your goals and alert settings are saved privately for this device. No account or password, and nobody else can see or change them.</div>' +
+        '<div class="row mt"><button class="btn ghost" data-link="make"' + (L.busy ? " disabled" : "") + ">" + (L.busy ? "Making a code…" : "Use on another device") + '</button><button class="link" data-link="enter">I have a code</button></div>' +
         (S.push.ios ? '<div class="sub mt">On iPhone, the Home Screen app keeps its own copy. Link it the same way.</div>' : "");
     }
-    return '<div class="card" id="linkCard"><h2>Your phones</h2>' + inner + (L.msg ? '<div class="sub mt" role="status">' + esc(L.msg) + "</div>" : "") + "</div>";
+    return '<div class="card" id="linkCard"><h2>Your devices</h2>' + inner + (L.msg ? '<div class="sub mt" role="status">' + esc(L.msg) + "</div>" : "") + "</div>";
   }
   async function linkMake() {
     const L = S.link;
@@ -2116,15 +2116,15 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     L.busy = true; L.msg = ""; render();
     try {
       await callFn({ action: "link_redeem", code });
-      L.enter = false; L.val = ""; L.msg = "Linked. This phone now shares goals and alerts with your other phone.";
+      L.enter = false; L.val = ""; L.msg = "Linked. This device now shares goals and alerts with your other device.";
       S.goals = (await myGoals()).map(mapGoal); cacheSet();
     } catch (e) {
-      L.msg = e.code === "bad_link" ? "That code isn't right or has expired. Check it, or make a new one on the other phone."
-        : e.code === "same_device" ? "That code was made on this phone. Type it on your other phone instead."
+      L.msg = e.code === "bad_link" ? "That code isn't right or has expired. Check it, or make a new one on the other device."
+        : e.code === "same_device" ? "That code was made on this device. Type it on your other device instead."
         : "Couldn't link: " + String((e && e.message) || e).slice(0, 120);
     } finally { L.busy = false; render(); }
   }
-  // Phones that still remember a player's old code hand it in once, so the goals made with it move to this phone.
+  // Devices that still remember a player's old code hand it in once, so the goals made with it move to this device.
   async function claimOldCodes() {
     const tags = PROFILES.list().map((p) => p.tag).filter((t) => lsGet("code:" + t));
     if (!tags.length) return;
@@ -2162,14 +2162,14 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         "<b>Estimates:</b> the game doesn\'t say who\'s online. Club activity and play sessions are worked out from battle times, so they\'re estimates."]) +
       sec("What\'s stored", [
         "<b>For each tracked player:</b> their public game stats (tag, name, trophies, brawlers, battles and club). Anyone using the app can see them, as in the game.",
-        "<b>For this phone:</b> a random key made on this phone, your goals, your alert settings and the address your browser uses for notifications. Only this phone, and phones you link, can see or change them.",
+        "<b>For this device:</b> a random key made on this device, your goals, your alert settings and the address your browser uses for notifications. Only this device, and devices you link, can see or change them.",
         "To stop abuse, the server counts requests from each network address. The counts are scrambled and deleted within two days.",
-        "<b>Explore:</b> looking up a player or club keeps a public copy of their game data on the server for up to a day (so many lookups cost one call to the game), and counts lookups per hour with no identifiers. It doesn\'t track them or you. Favourites, recent lookups and \u201csince you last looked\u201d snapshots stay on this phone.",
-        "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this phone."]) +
+        "<b>Explore:</b> looking up a player or club keeps a public copy of their game data on the server for up to a day (so many lookups cost one call to the game), and counts lookups per hour with no identifiers. It doesn\'t track them or you. Favourites, recent lookups and \u201csince you last looked\u201d snapshots stay on this device.",
+        "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this device."]) +
       sec("Keeping and removing", [
-        "Each phone can start tracking 2 players (50 across the app). Removing a player you started frees your spot; if no other phone started them, they pause and their history is kept.",
+        "Each device can start tracking 2 players (50 across the app). Removing a player you started frees your spot; if no other device started them, they pause and their history is kept.",
         "Players nobody opens for 30 days stop being checked. Opening one again starts it back up when there\'s room.",
-        "Turning notifications off deletes this phone\'s notification address for that player. Removing a goal deletes it.",
+        "Turning notifications off deletes this device\'s notification address for that player. Removing a goal deletes it.",
         'Questions, corrections, or a player\'s saved history to delete: open an issue on <a href="' + REPO + '/issues" target="_blank" rel="noopener">GitHub Issues</a> (free GitHub account needed). Please don\'t post anything private there.']) +
       '<div class="tour-foot"><span class="tour-n">Unofficial fan app</span><div class="tour-btns"><button class="btn" data-about="close">Done</button></div></div></div>';
     aboutFrom = document.activeElement;
@@ -2307,7 +2307,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     if (ev.target.id === "hCode") { H.code = ev.target.value; paintAction(); }
   });
   document.addEventListener("change", (ev) => {
-    // Some phones report every turn of the time wheel, so the time is saved once it settles or the picker closes.
+    // Some devices report every turn of the time wheel, so the time is saved once it settles or the picker closes.
     if (ev.target.matches && ev.target.matches("input[data-recap-at]")) { const el = ev.target; clearTimeout(recapTimer); recapTimer = setTimeout(() => flushRecap(el), document.activeElement === el ? 1500 : 0); return; }
     if (ev.target.id === "gKind") { S.goalKind = ev.target.value; const w = $("#gBrWrap"); if (w) w.hidden = S.goalKind !== "brawler"; }
   });
@@ -2380,7 +2380,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
   let rT = null;
   window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(render, 150); });
 
-  // ---------- profiles saved on this phone ----------
+  // ---------- profiles saved on this device ----------
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
   const PROFILES = {
@@ -2392,7 +2392,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     remove(t) { this.save(this.list().filter((x) => x.tag !== t)); },
   };
   const cardOf = (p) => ({ tag: p.tag, name: p.name, icon: p.icon, trophies: p.trophies, club: p.club, clubName: p.club_name, clubBadge: p.club_badge });
-  // Which profile to open: a link or notification (?p=TAG), else the last one used. A phone that used the app
+  // Which profile to open: a link or notification (?p=TAG), else the last one used. A device that used the app
   // before it had profiles was the first profile's, so it opens straight to it with its code and alerts.
   async function pickProfile() {
     let list = PROFILES.list(), cur = PROFILES.current();
@@ -2449,9 +2449,9 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         '<div class="home-top"><div class="emblem" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="46"/><circle class="moon" cx="50" cy="4" r="3"/></svg><img src="icon-192.png" alt=""></div>' +
           (canCloseHome() ? '<button class="home-x" data-home="close" aria-label="Back to the open player"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>' : "") + "</div>" +
         '<h1 class="home-h" tabindex="-1">' + (first ? "Track a Brawl Stars player" : "Players") + "</h1>" +
-        '<p class="home-lede">' + (first ? "Trophies, battles, brawlers and club stats, saved every 15 minutes. Enter a player tag to start." : "Open a player saved on this phone, or add another one.") + "</p>" +
+        '<p class="home-lede">' + (first ? "Trophies, battles, brawlers and club stats, saved every 15 minutes. Enter a player tag to start." : "Open a player saved on this device, or add another one.") + "</p>" +
         (H.note ? '<p class="home-note" role="status">' + esc(H.note) + "</p>" : "") +
-        (first ? "" : '<section class="home-sec" aria-labelledby="hsT"><div class="home-sec-h"><h2 id="hsT">On this phone</h2><button class="link" data-home="edit" id="hEdit">' + (H.edit ? "Done" : "Edit") + '</button></div><div id="hSaved"></div></section>') +
+        (first ? "" : '<section class="home-sec" aria-labelledby="hsT"><div class="home-sec-h"><h2 id="hsT">On this device</h2><button class="link" data-home="edit" id="hEdit">' + (H.edit ? "Done" : "Edit") + '</button></div><div id="hSaved"></div></section>') +
         '<section class="home-sec" aria-labelledby="haT"><div class="home-sec-h"><h2 id="haT">Add a player</h2></div>' +
           '<div class="addcard">' +
             '<label class="tagfield" id="hTagField" for="hTag"><span class="hash" aria-hidden="true">#</span>' +
@@ -2487,7 +2487,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         "</button>" +
         (H.edit ? '<button class="premove" data-remove="' + esc(p.tag) + '">Remove</button>' : "") +
       "</div>";
-    }).join("") + (H.edit ? '<div class="hint">Removing a player takes it off this phone. If this phone started tracking them and no other phone did, tracking pauses; their history is kept.</div>' : "");
+    }).join("") + (H.edit ? '<div class="hint">Removing a player takes it off this device. If this device started tracking them and no other device did, tracking pauses; their history is kept.</div>' : "");
     const e = $("#hEdit"); if (e) e.textContent = H.edit ? "Done" : "Edit";
   }
   // Update the saved cards (trophies, names, clubs) from the server.
@@ -2517,9 +2517,9 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         '<span class="pc-id"><span class="pc-name">' + esc(pl.name) + '</span><span class="pc-tag">#' + esc(pl.tag) + "</span></span>" +
         '<span class="pc-tro">' + TROPHY + fmt(pl.trophies) + "</span></div>" +
       (saved
-        ? '<div class="pc-note">' + esc(pl.name) + ' is already saved on this phone.</div><button class="btn wide" data-home="open-look">Open ' + esc(pl.name) + "</button>"
+        ? '<div class="pc-note">' + esc(pl.name) + ' is already saved on this device.</div><button class="btn wide" data-home="open-look">Open ' + esc(pl.name) + "</button>"
         : L.tracked
-          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts you set stay private to this phone.</div>" +
+          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts you set stay private to this device.</div>" +
             '<div id="pvAction"></div>'
           : '<div class="pc-sec"><span class="pc-lbl" id="clubLbl">Club to follow</span><div id="pvClub"></div></div>' +
             '<div id="pvAction"></div>') +
@@ -2560,8 +2560,8 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       box.innerHTML = '<div class="pv-wait big"><i></i><span>' + (L.tracked ? "Saving " + esc(L.player.name) + "…" : "Setting up " + esc(L.player.name) + ". Reading their stats" + (H.clubMode === "none" ? "" : " and club") + ", which takes about 15 seconds the first time.") + '</span></div><div class="pv-bar"><i></i></div>';
       return;
     }
-    box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this phone" : "Start tracking") + "</button>" +
-      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this phone." + (L.tracked ? "" : " Each phone can start tracking 2 players.") + "</div>" +
+    box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this device" : "Start tracking") + "</button>" +
+      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this device." + (L.tracked ? "" : " Each device can start tracking 2 players.") + "</div>" +
       (H.err ? '<div class="pv-err" role="alert">' + esc(H.err) + "</div>" : "");
   }
   let lookT = null, lookSeq = 0, clubT = null, clubSeq = 0;
@@ -2623,17 +2623,17 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     } catch (e) {
       H.busy = false;
       H.err = e.code === "full" ? "The app is following as many players as it can right now (50). Players nobody opens for 30 days pause, which frees up space, so try again later."
-        : e.code === "phone_full" ? phoneFullMsg((e.data && e.data.held) || [])
+        : e.code === "phone_full" ? deviceFullMsg((e.data && e.data.held) || [])
         : e.code === "player_not_found" ? "Brawl Stars couldn't find that player just now. Try again."
         : e.code === "club_not_found" ? "Brawl Stars couldn't find that club just now. Try again."
         : "Couldn't add the player: " + String((e && e.message) || e).slice(0, 120);
       paintAction(); if (!L.tracked) paintClub();
     }
   }
-  // Each phone can start tracking 2 players. Saving a player someone else already tracks doesn't count.
-  function phoneFullMsg(held) {
+  // Each device can start tracking 2 players. Saving a player someone else already tracks doesn't count.
+  function deviceFullMsg(held) {
     const names = held.map((t) => { const p = PROFILES.list().find((x) => x.tag === t); return p && p.name ? p.name : "#" + t; });
-    return "Each phone can start tracking 2 players" + (names.length ? ", and this one is tracking " + names.join(" and ") : "") +
+    return "Each device can start tracking 2 players" + (names.length ? ", and this one is tracking " + names.join(" and ") : "") +
       ". Remove one of them from your list to add someone new.";
   }
   function openProfile(tag) {
@@ -2758,8 +2758,8 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         <g class="bell" transform="translate(196 104)"><path d="M-12 6a12 12 0 0 1 24 0v8l4 5h-32l4-5Z"/><path d="M-4 23h8"/></g></svg>` },
     { k: "Private", t: "Your goals stay yours",
       rows: [["eye", "Anyone can look", "Brawl Stars stats are public, so anyone with the app can follow any player."],
-        ["key", "No account, no password", "Goals and alert settings are saved privately for this phone. Nobody else can see or change them."],
-        ["shield", "Got another phone?", "On the Goals tab, tap Use on another phone for a one-time 6-digit code."]],
+        ["key", "No account, no password", "Goals and alert settings are saved privately for this device. Nobody else can see or change them."],
+        ["shield", "Got another device?", "On the Goals tab, tap Use on another device for a one-time 6-digit code."]],
       art: `<svg class="art-code" viewBox="0 0 280 150" aria-hidden="true">
         ${["4", "8", "2", "9", "1", "3"].map((c, i) => `<g class="cap" style="animation-delay:${0.15 + i * 0.12}s" transform="translate(${6 + i * 33 + (i > 2 ? 10 : 0)} 54)"><rect width="29" height="42"/><text x="14.5" y="29">${c}</text></g>`).join("")}
         <g class="lock" transform="translate(234 75)"><path class="shackle" d="M-9 -4v-8a9 9 0 0 1 18 0v8"/><rect x="-14" y="-4" width="28" height="24"/><circle cx="0" cy="8" r="3"/></g></svg>` },
@@ -2842,9 +2842,9 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   window.addEventListener("hashchange", () => { const t = (location.hash || "").slice(1); if (RENDER[t] && t !== S.tab) { S.tab = t; render(); window.scrollTo({ top: 0 }); } });
 
   // ---------- Explore: any player or club, without tracking ----------
-  // A screen of its own over My stats. Looking someone up saves nothing on the server about them or this phone and
+  // A screen of its own over My stats. Looking someone up saves nothing on the server about them or this device and
   // doesn't use a tracking spot: the server fetches the public data, keeps it for everyone for a couple of minutes,
-  // and that's it. This phone remembers recent lookups, favourites and a small snapshot per player, so a return
+  // and that's it. This device remembers recent lookups, favourites and a small snapshot per player, so a return
   // visit can say what changed ("since you last looked").
   // Routes live in the address: #explore, #explore/p/TAG, #explore/vs/TAG/TAG, #explore/club/TAG.
   const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {} };
@@ -2960,7 +2960,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   }
   function xRetry(kind, tag) { delete X.state[kind + ":" + tag]; X.cache.delete(kind + ":" + tag); paintX(); }
 
-  // ----- what this phone remembers (no server involved) -----
+  // ----- what this device remembers (no server involved) -----
   const xRead = (k, d) => { try { const v = JSON.parse(lsGet(k) || "null"); return v == null ? d : v; } catch (e) { return d; } };
   const xWrite = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   function xRemember(k, tag, name, pic) {
@@ -3052,7 +3052,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       (mine.length ? '<div class="xsec-h"><h2>Your players</h2></div><div class="xchips">' + mine.map((p) => chip({ k: "p", tag: p.tag, name: p.name, pic: p.icon })).join("") + "</div>" : "") +
       (fav.length ? '<div class="xsec-h"><h2>Favourites</h2></div><div class="xchips">' + fav.map(chip).join("") + "</div>" : "") +
       (recent.length ? '<div class="xsec-h"><h2>Recent</h2><button class="link" data-xclear>Clear</button></div><div class="xchips">' + recent.map(chip).join("") + "</div>" : "") +
-      (!fav.length && !recent.length ? '<div class="card"><h2>Tip</h2><div class="sub">Star a player or club to keep them here. Next time you open them, you\'ll see what changed since you last looked. That stays on this phone.</div></div>' : "") +
+      (!fav.length && !recent.length ? '<div class="card"><h2>Tip</h2><div class="sub">Star a player or club to keep them here. Next time you open them, you\'ll see what changed since you last looked. That stays on this device.</div></div>' : "") +
       '<div class="xsoon">' + xsvg("card") + "<span><b>Coming next: share cards.</b> Turn a player, a head-to-head or a battle recap into an image to send to friends.</span></div>" +
       "</div>";
     return '<div class="xhome">' + left + right + "</div>";
@@ -3086,7 +3086,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   function xSinceCard(p) {
     const s = X.since[p.tag];
     if (!s) return "";
-    if (!s.prev) return '<div class="card xsince"><h2>Since you last looked</h2><div class="sub">First look at ' + esc(p.name) + " on this phone. Come back later to see what changed. " + (isFav("p", p.tag) ? "" : "Star them to keep them handy.") + "</div></div>";
+    if (!s.prev) return '<div class="card xsince"><h2>Since you last looked</h2><div class="sub">First look at ' + esc(p.name) + " on this device. Come back later to see what changed. " + (isFav("p", p.tag) ? "" : "Star them to keep them handy.") + "</div></div>";
     const a = s.prev, c = s.cur, items = [];
     const add = (label, d, unit) => { if (d) items.push("<li><span>" + label + '</span><b class="' + tcls(d) + '">' + sgn(d) + (unit || "") + "</b></li>"); };
     add("Trophies", (c.t || 0) - (a.t || 0));
@@ -3098,7 +3098,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     for (const [k, d] of gains) add(esc(title(k)), d);
     return '<div class="card xsince"><h2>Since you last looked<span class="sp"></span><span class="aside">' + esc(ago(a.at)) + "</span></h2>" +
       (items.length ? "<ul>" + items.join("") + "</ul>" : '<div class="sub">No change since ' + esc(dtShort(a.at)) + ".</div>") +
-      '<div class="xnote">Compared with what this phone saw on ' + esc(dtShort(a.at)) + ". Kept on this phone only.</div></div>";
+      '<div class="xnote">Compared with what this device saw on ' + esc(dtShort(a.at)) + ". Kept on this device only.</div></div>";
   }
   function xTopBrawlers(p) {
     const b = (p.brawlers || []).slice().sort((x, y) => (y.tr || 0) - (x.tr || 0));
@@ -3112,7 +3112,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const paused = r.tracked && r.active === false;
     return '<div class="card xtrack"><h2>Want history?</h2><p>' + (r.tracked && !paused
       ? esc(p.name) + " is already tracked in the app, so adding them to My stats is free: trophy history every 15 minutes, club activity, goals and alerts."
-      : "Explore shows what the game shares right now. Tracking " + esc(p.name) + " saves their stats every 15 minutes for charts, club activity, goals and alerts. Each phone can start tracking 2 players.") +
+      : "Explore shows what the game shares right now. Tracking " + esc(p.name) + " saves their stats every 15 minutes for charts, club activity, goals and alerts. Each device can start tracking 2 players.") +
       '</p><button class="btn" data-xtrack="' + esc(p.tag) + '">' + (r.tracked && !paused ? "Add to My stats" : "Track " + esc(p.name)) + "</button></div>";
   }
   function xBattlesCard(p) {
@@ -3284,19 +3284,19 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   async function xTrack(tag) {
     const st = X.state["p:" + tag], r = st && st.r;
     if (r && r.tracked && r.active !== false) {
-      // Already tracked: saving it to this phone is free.
+      // Already tracked: saving it to this device is free.
       X.msg[tag] = { t: "Adding to My stats…" }; paintX();
       try {
         const res = await callFn({ action: "profile_add", tag });
         PROFILES.upsert(cardOf(res.profile));
         xOpen(tag);
       } catch (e) {
-        X.msg[tag] = { bad: true, t: e.code === "phone_full" ? phoneFullMsg((e.data && e.data.held) || []) : e.code === "full" ? "The app is following as many players as it can right now (50). Try again later." : "Couldn't add: " + String((e && e.message) || e).slice(0, 100) };
+        X.msg[tag] = { bad: true, t: e.code === "phone_full" ? deviceFullMsg((e.data && e.data.held) || []) : e.code === "full" ? "The app is following as many players as it can right now (50). Try again later." : "Couldn't add: " + String((e && e.message) || e).slice(0, 100) };
         paintX();
       }
       return;
     }
-    // Not tracked (or paused): the usual add form, with the club choice and the per-phone limit explained.
+    // Not tracked (or paused): the usual add form, with the club choice and the per-device limit explained.
     xClose();
     showHome({ prefill: tag });
   }
@@ -3355,7 +3355,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const replayWelcome = new URLSearchParams(location.search).has("welcome");
     if (replayWelcome) { try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {} }
     const xr = xParse(location.hash);
-    if (!start) { $("#skel").hidden = true; showHome(); if (xr) { xShow(xr); return; } if (!lsGet("welcomed") || replayWelcome) showIntro(); return; } // first time on this phone
+    if (!start) { $("#skel").hidden = true; showHome(); if (xr) { xShow(xr); return; } if (!lsGet("welcomed") || replayWelcome) showIntro(); return; } // first time on this device
     if (replayWelcome) setTimeout(showIntro, 0);
     ME = start;
     const card = PROFILES.list().find((p) => p.tag === ME) || {};

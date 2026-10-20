@@ -76,7 +76,7 @@ const TAG = "8YRJ090Q2";
   sent.length = 0;
   await internals.checkEvents(prof, { trophies: 48100, club: null, elo: null, brawlers: null, prevClub: null, newClub: null });
   const goalSends = sent.filter((s) => s.payload.title.includes("Goal"));
-  ok("A's 48,000 goal alert goes to A's devices only (A and C's old phone), not B", goalSends.length === 2 && goalSends.every((s) => s.endpoint !== "https://push.test/B"), goalSends.map((s) => s.endpoint));
+  ok("A's 48,000 goal alert goes to A's devices only (A and C's old device), not B", goalSends.length === 2 && goalSends.every((s) => s.endpoint !== "https://push.test/B"), goalSends.map((s) => s.endpoint));
   ok("milestone alerts still go to everyone following the player", sent.filter((s) => s.payload.title.includes("48,000")).length === 3, sent.map((s) => s.payload.title));
   ok("push_subscribe for an untracked player is refused", (await call({ action: "push_subscribe", tag: "Q2", device: A, sub: { endpoint: "https://push.test/x", keys: { p256dh: "k", auth: "a" } } })).status === 404);
 
@@ -89,7 +89,7 @@ const TAG = "8YRJ090Q2";
   ok("a forged X-Forwarded-For doesn't dodge the limit (the gateway's own address header wins)", r.status === 429, r.status);
   const adds = [];
   for (const t of ["2PP", "2PY", "2PL", "2PQ", "2PG", "2PR", "2PJ"]) adds.push((await call({ action: "profile_add", tag: t, device: dev() }, "203.0.113.60")).status);
-  ok("7th new player from one address in an hour is refused (even from different phones)", adds.slice(0, 6).every((s) => s === 200) && adds[6] === 429, adds);
+  ok("7th new player from one address in an hour is refused (even from different devices)", adds.slice(0, 6).every((s) => s === 200) && adds[6] === 429, adds);
   ok("re-adding an already tracked player isn't limited", (await call({ action: "profile_add", tag: "2PP" }, "203.0.113.60")).exists === true);
   ok("recap can't be triggered twice in a row", (await call({ action: "recap" })).ok && (await call({ action: "recap" })).skipped === true);
 

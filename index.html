@@ -298,6 +298,21 @@ section[data-tab] { display: grid; gap: 12px; }
   .detail { padding-left: 0; }
   .tabbar button { letter-spacing: 0.5px; font-size: 10.5px; }
 }
+/* Tablet and wider: two columns of panels (built by layoutColumns in the script). */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col { display: grid; gap: 12px; min-width: 0; }
+.col.stick { position: sticky; top: calc(var(--hdr-h, 120px) + 14px); }
+@media (min-width: 768px) {
+  .wrap { max-width: 1180px; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+  .top {
+    margin-left: calc(-1 * max(24px, env(safe-area-inset-left, 0px)));
+    margin-right: calc(-1 * max(24px, env(safe-area-inset-right, 0px)));
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+  .rangebar { max-width: 520px; }
+  .tabbar nav { max-width: 720px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .sync.busy i { animation: none; }
 }
@@ -598,7 +613,7 @@ section[data-tab] { display: grid; gap: 12px; }
   function drawChart(host, pts, o) {
     host.innerHTML = "";
     if (!pts.length) { host.innerHTML = '<div class="chart-empty">' + esc(o.empty || "No readings yet.") + "</div>"; return; }
-    const W = Math.max(260, host.clientWidth || 320), H = o.h || 170, L = 2, R = 60, T = 12, B = 24;
+    const W = Math.max(260, host.clientWidth || 320), H = Math.round((o.h || 170) * (WIDE() ? 1.3 : 1)), L = 2, R = 60, T = 12, B = 24;
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     let x0 = Math.min(...xs), x1 = Math.max(...xs);
     if (x0 === x1) { const pd = o.index ? 1 : HOUR; x0 -= pd; x1 += pd; }
@@ -1019,6 +1034,45 @@ section[data-tab] { display: grid; gap: 12px; }
 
   function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + esc(msg) + "</div></div>"; }
 
+  // ---------- tablet layout ----------
+  // On iPad-sized screens and wider, each tab's panels are split into two columns. Phones keep one column.
+  const WIDE = () => !!(window.matchMedia && window.matchMedia("(min-width: 768px)").matches);
+  function layoutColumns(sec, tab) {
+    if (!WIDE()) return;
+    const kids = [...sec.children];
+    if (kids.length < 2) return;
+    const right = new Set(), full = new Set();
+    let sticky = true;
+    if (tab === "me") {
+      // Left: trophies, chart and career. Right: battles, modes, maps and the match log.
+      sticky = false;
+      let battles = false;
+      for (const k of kids) {
+        if (k.id === "sec-battles") battles = true;
+        else if (k.id === "sec-career") battles = false;
+        if (k.matches(".note")) full.add(k);
+        else if (battles) right.add(k);
+      }
+    } else if (tab === "goals") {
+      // Left: unlock and new-goal form. Right: the goals.
+      const form = sec.querySelector("#goalForm"), formCard = form && form.closest("section > *");
+      let after = false;
+      for (const k of kids) { if (after) right.add(k); if (k === formCard) after = true; }
+    } else {
+      // Club: summary and chart beside the member board. Brawlers: summary beside the brawler list.
+      right.add(kids[kids.length - 1]);
+    }
+    if (!right.size) return;
+    const cols = document.createElement("div"), a = document.createElement("div"), b = document.createElement("div");
+    cols.className = "cols"; a.className = "col"; b.className = "col";
+    for (const k of kids) if (!full.has(k)) (right.has(k) ? b : a).appendChild(k);
+    cols.append(a, b);
+    sec.prepend(cols);
+    // Keep the short summary column in view beside a long list, when it fits on screen.
+    const hdr = $(".top").offsetHeight || 120;
+    if (sticky && a.offsetHeight + hdr + 40 < window.innerHeight) a.classList.add("stick");
+  }
+
   // ---------- render ----------
   const RENDER = { me: renderMe, club: renderClub, brawlers: renderBrawlers, goals: renderGoals };
   function render() {
@@ -1042,6 +1096,7 @@ section[data-tab] { display: grid; gap: 12px; }
     const caret = active === "brSearch" ? document.activeElement.selectionStart : null;
     charts.length = 0;
     sec.innerHTML = RENDER[S.tab]();
+    layoutColumns(sec, S.tab);
     flushCharts();
     for (const b of document.querySelectorAll(".tabbar button")) { if (b.dataset.go === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
     if (active === "brSearch") { const el = $("#brSearch"); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) {} } }

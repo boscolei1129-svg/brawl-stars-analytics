@@ -218,7 +218,7 @@ section[data-tab] { display: grid; gap: 12px; }
 .res.w { color: var(--teal); }
 .res.l { color: var(--bad); }
 .res.d { color: var(--muted); }
-.res.top { color: var(--accent); }
+.res.first { color: var(--accent); }
 .you { color: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 1px; margin-left: 6px; }
 .role { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; border: 1px solid var(--line); color: var(--fg-2); }
 .role.president { color: var(--accent); border-color: rgba(255, 122, 26, 0.5); }
@@ -414,7 +414,7 @@ section[data-tab] { display: grid; gap: 12px; }
     return "d";
   };
   const resLabel = (b) => { const m = /rank\s*(\d+)/i.exec(b.r || ""); if (m) return "#" + m[1]; const o = outcome(b); return o === "w" ? "WIN" : o === "l" ? "LOSS" : "DRAW"; };
-  const resCls = (b) => (/rank\s*1$/i.test(b.r || "") ? "top" : outcome(b));
+  const resCls = (b) => (/rank\s*1$/i.test(b.r || "") ? "first" : outcome(b));
 
   // ---------- data (Supabase) ----------
   const cmpSnap = (a, b) => ((a.nb || 0) - (b.nb || 0)) || (a.ts - b.ts);

@@ -87,18 +87,43 @@ function stable(v: unknown): string {
   return JSON.stringify(v ?? null);
 }
 
-async function latest(column: "brawlers" | "club") {
+const ms = (v: unknown) => (v ? new Date(String(v)).getTime() : 0);
+
+async function latest(column: "club") {
   const { data, error } = await sb.from("readings").select(`${column}, nb, ts`).not(column, "is", null)
     .order("nb", { ascending: false, nullsFirst: false }).order("ts", { ascending: false }).limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }
 
+async function getSetting(key: string) {
+  const { data, error } = await sb.from("settings").select("value").eq("key", key).maybeSingle();
+  if (error) throw error;
+  return data?.value ?? null;
+}
+
+// Brawler lists are saved as changes only (just the brawlers whose numbers moved); the full current
+// list is kept in settings. Without it, adding the saved changes up in order gives the same list.
+async function brawlersFull(): Promise<Record<string, unknown>> {
+  const saved = await getSetting("brawlers_full");
+  if (saved) return JSON.parse(saved);
+  const { data, error } = await sb.from("readings").select("brawlers").not("brawlers", "is", null)
+    .order("ts", { ascending: true }).order("id", { ascending: true });
+  if (error) throw error;
+  const full: Record<string, unknown> = {};
+  for (const r of data ?? []) Object.assign(full, r.brawlers);
+  return full;
+}
+
 async function refresh(src: string) {
-  const { data: last, error: lastErr } = await sb.from("readings").select("ts").order("ts", { ascending: false }).limit(1);
+  const { data: lastRows, error: lastErr } = await sb.from("readings")
+    .select("id, ts, checked, nb, trophies, club_trophies, player")
+    .order("ts", { ascending: false }).order("id", { ascending: false }).limit(1);
   if (lastErr) throw lastErr;
-  if (last?.[0] && Date.now() - new Date(last[0].ts).getTime() < MIN_GAP_MS) {
-    return { ok: true, skipped: true, ts: last[0].ts };
+  const last = lastRows?.[0] ?? null;
+  const lastSeen = last ? Math.max(ms(last.ts), ms(last.checked)) : 0;
+  if (last && Date.now() - lastSeen < MIN_GAP_MS) {
+    return { ok: true, skipped: true, ts: new Date(lastSeen).toISOString() };
   }
   const [pr, cr] = await Promise.allSettled([
     getFeedRetry(() => feed("player.byTag", ME)),
@@ -106,8 +131,9 @@ async function refresh(src: string) {
   ]);
   if (pr.status === "rejected" && cr.status === "rejected") throw new Error(String(pr.reason?.message ?? pr.reason));
 
-  const row: Record<string, unknown> = { src, ts: new Date().toISOString() };
-  let saved = 0;
+  const now = new Date().toISOString();
+  const row: Record<string, unknown> = { src, ts: now };
+  let saved = 0, stale = false, newFull: Record<string, unknown> | null = null;
   if (pr.status === "fulfilled") {
     const { player, brawlers, battles } = compactPlayer(pr.value);
     if (battles.length) {
@@ -118,14 +144,15 @@ async function refresh(src: string) {
     const nb = battles.length ? battles.reduce((m: string, b: any) => (b.t > m ? b.t : m), battles[0].t) : null;
     // A delayed feed (older newest battle than what's saved) must not overwrite newer player data.
     const { data: maxRow } = await sb.from("readings").select("nb").not("nb", "is", null).order("nb", { ascending: false }).limit(1);
-    const maxNb = maxRow?.[0]?.nb ? new Date(maxRow[0].nb).getTime() : 0;
-    const stale = nb != null && new Date(nb).getTime() < maxNb;
+    stale = nb != null && ms(nb) < ms(maxRow?.[0]?.nb);
     if (!stale) {
       row.nb = nb;
       row.trophies = player.trophies;
       row.player = player;
-      const prev = await latest("brawlers");
-      if (!prev || stable(prev.brawlers) !== stable(brawlers)) row.brawlers = brawlers;
+      const full = await brawlersFull();
+      const delta: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(brawlers)) if (stable(full[k]) !== stable(v)) delta[k] = v;
+      if (Object.keys(delta).length) { row.brawlers = delta; newFull = { ...full, ...delta }; }
     }
   }
   if (cr.status === "fulfilled") {
@@ -134,14 +161,28 @@ async function refresh(src: string) {
     const prev = await latest("club");
     if (!prev || stable(prev.club) !== stable(club)) row.club = club;
   }
-  const { error } = await sb.from("readings").insert(row);
-  if (error) throw error;
-  return {
-    ok: true, ts: row.ts, trophies: row.trophies ?? null, club_trophies: row.club_trophies ?? null,
+  const result = {
+    ok: true, ts: now, trophies: (row.trophies as number) ?? null, club_trophies: (row.club_trophies as number) ?? null,
     battles_seen: saved, stored_brawlers: "brawlers" in row, stored_club: "club" in row,
     player_error: pr.status === "rejected" ? String(pr.reason?.message ?? pr.reason) : null,
     club_error: cr.status === "rejected" ? String(cr.reason?.message ?? cr.reason) : null,
   };
+  // Nothing moved since the last reading: mark that reading as confirmed now instead of adding a copy.
+  const unchanged = !!last && pr.status === "fulfilled" && cr.status === "fulfilled" && !stale &&
+    !("brawlers" in row) && !("club" in row) && row.trophies === last.trophies && row.club_trophies === last.club_trophies &&
+    ms(row.nb) === ms(last.nb) && stable(row.player) === stable(last.player);
+  if (unchanged) {
+    const { error } = await sb.from("readings").update({ checked: now }).eq("id", last!.id);
+    if (error) throw error;
+    return { ...result, unchanged: true };
+  }
+  const { error } = await sb.from("readings").insert(row);
+  if (error) throw error;
+  if (newFull) {
+    const { error: setErr } = await sb.from("settings").upsert({ key: "brawlers_full", value: JSON.stringify(newFull) });
+    if (setErr) throw setErr;
+  }
+  return result;
 }
 
 async function sha256(text: string) {
@@ -167,8 +208,7 @@ async function currentValue(kind: string, brawler?: string) {
   if (kind === "player") return p?.trophies ?? null;
   if (kind === "elo") return p?.elo ?? null;
   if (kind === "brawler" && brawler) {
-    const b = await latest("brawlers");
-    const v = (b?.brawlers as any)?.[brawler];
+    const v = (await brawlersFull())[brawler];
     return Array.isArray(v) ? v[0] : null;
   }
   return null;

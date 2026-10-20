@@ -14,9 +14,14 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="preconnect" href="https://iuukdskmzjglpvtlwldw.supabase.co" crossorigin>
+<style>
+@font-face { font-family: "Chakra Petch"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/chakra-petch-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-style: normal; font-weight: 600; font-display: swap; src: url(fonts/chakra-petch-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/chakra-petch-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/jetbrains-mono-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/jetbrains-mono-latin-700-normal.woff2) format("woff2"); }
+</style>
 <style>
 /* Layout: esports HUD. One phone-width column of hard-edged panels, sticky status bar, text tab bar with an orange rail. */
 :root {
@@ -343,7 +348,7 @@ section[data-tab] { display: grid; gap: 12px; }
   const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
 
   const S = {
-    readings: [], battleRows: [], goals: [], loaded: false, ownerCode: null, goalBusy: false,
+    readings: [], battleRows: [], goals: [], ver: 0, loaded: false, ownerCode: null, goalBusy: false,
     tab: "me", live: { busy: false, err: null, at: 0 },
     r: { me: "24h", climb: "7d", club: "7d", members: "7d" },
     bType: "all", brSort: "trophies", brQuery: "", memSort: "trophies", openBrawler: null,
@@ -425,38 +430,70 @@ section[data-tab] { display: grid; gap: 12px; }
     return j;
   }
   const mapGoal = (g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created: msOf(g.created_at) });
-  const READ_COLS = "id,ts,nb,src,trophies,club_trophies,player,brawlers,club";
+  const READ_COLS = "id,ts,checked,nb,src,trophies,club_trophies,player,brawlers,club";
+  // A copy of everything already downloaded is kept on this device, so the app opens instantly
+  // and only asks the server for what's new.
+  const CACHE_V = 1;
+  function idb(mode, fn) {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") { reject(new Error("no IndexedDB")); return; }
+      const open = indexedDB.open("brawl-stats", 1);
+      open.onupgradeneeded = () => open.result.createObjectStore("kv");
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        let req;
+        try { const tx = db.transaction("kv", mode); req = fn(tx.objectStore("kv")); tx.oncomplete = () => { db.close(); resolve(req && req.result); }; tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); }; }
+        catch (e) { db.close(); reject(e); }
+      };
+    });
+  }
+  const cacheGet = () => Promise.race([idb("readonly", (st) => st.get("data")).catch(() => null), new Promise((r) => setTimeout(() => r(null), 1500))]);
+  const cacheSet = () => idb("readwrite", (st) => st.put({ v: CACHE_V, at: Date.now(), readings: S.readings, battleRows: S.battleRows, goals: S.goals }, "data")).catch(() => {});
   async function loadData(full) {
     if (full || !S.readings.length) {
       const [rd, bt, gl] = await Promise.all([restAll("readings", READ_COLS), restAll("battles", "*"), rest("goals?select=*&order=created_at.asc")]);
       S.readings = rd; S.battleRows = bt; S.goals = gl.map(mapGoal);
-      return;
+    } else {
+      const lastId = Math.max(...S.readings.map((r) => r.id));
+      const lastT = S.battleRows.length ? Math.max(...S.battleRows.map((b) => msOf(b.t))) : 0;
+      // Battles can arrive slightly out of order, so look back a few hours and de-duplicate.
+      const since = new Date(Math.max(0, lastT - 6 * HOUR)).toISOString();
+      // The newest reading is fetched again: when nothing changed, the server only moves its "checked" time.
+      const [rd, bt, gl] = await Promise.all([
+        restAll("readings", READ_COLS, "id=gte." + lastId),
+        restAll("battles", "*", "t=gt." + encodeURIComponent(since)),
+        rest("goals?select=*&order=created_at.asc"),
+      ]);
+      if (!rd.some((r) => r.id === lastId)) return loadData(true); // saved copy no longer matches the server
+      const rm = new Map(S.readings.map((r) => [r.id, r]));
+      for (const r of rd) rm.set(r.id, r);
+      S.readings = [...rm.values()];
+      const bm = new Map(S.battleRows.map((b) => [msOf(b.t), b]));
+      for (const b of bt) bm.set(msOf(b.t), b);
+      S.battleRows = [...bm.values()];
+      S.goals = gl.map(mapGoal);
     }
-    const lastId = Math.max(...S.readings.map((r) => r.id));
-    const lastT = S.battleRows.length ? Math.max(...S.battleRows.map((b) => msOf(b.t))) : 0;
-    // Battles can arrive slightly out of order, so look back a few hours and de-duplicate.
-    const since = new Date(Math.max(0, lastT - 6 * HOUR)).toISOString();
-    const [rd, bt, gl] = await Promise.all([
-      restAll("readings", READ_COLS, "id=gt." + lastId),
-      restAll("battles", "*", "t=gt." + encodeURIComponent(since)),
-      rest("goals?select=*&order=created_at.asc"),
-    ]);
-    S.readings.push(...rd);
-    const bm = new Map(S.battleRows.map((b) => [msOf(b.t), b]));
-    for (const b of bt) bm.set(msOf(b.t), b);
-    S.battleRows = [...bm.values()];
-    S.goals = gl.map(mapGoal);
+    S.ver++;
+    cacheSet();
   }
 
   // ---------- derive ----------
   function derive() {
+    if (D && D.ver === S.ver) return;
     const rs = S.readings.slice().sort((a, b) => msOf(a.ts) - msOf(b.ts) || a.id - b.id);
     const ticks = [], ps = [], cs = [];
-    let curB = null;
+    let curB = null, lastSeen = 0;
     for (const r of rs) {
-      const ts = msOf(r.ts), nb = msOf(r.nb);
-      if (r.brawlers) curB = r.brawlers;
-      if (r.trophies != null || r.club_trophies != null) ticks.push([ts, r.trophies, r.club_trophies, nb]);
+      const ts = msOf(r.ts), nb = msOf(r.nb), ck = msOf(r.checked);
+      lastSeen = Math.max(lastSeen, ts, ck || 0);
+      // Brawler lists are saved as changes since the previous list, so add them up in order.
+      if (r.brawlers) curB = Object.assign({}, curB, r.brawlers);
+      if (r.trophies != null || r.club_trophies != null) {
+        ticks.push([ts, r.trophies, r.club_trophies, nb]);
+        // A reading the server confirmed again later (nothing had changed) also counts at that later time.
+        if (ck && ck > ts) ticks.push([ck, r.trophies, r.club_trophies, nb]);
+      }
       if (r.player) ps.push({ ts, nb, p: r.player, b: curB || {} });
       if (r.club) cs.push({ ts, c: r.club });
     }
@@ -470,7 +507,8 @@ section[data-tab] { display: grid; gap: 12px; }
       eloSeries: ps.filter((s) => s.p.elo != null).map((s) => [s.ts, s.p.elo]),
       P: ps.reduce((best, s) => (!best || cmpSnap(s, best) > 0 ? s : best), null), C: cs[cs.length - 1] || null,
     };
-    D.lastTs = rs.length ? msOf(rs[rs.length - 1].ts) : 0;
+    D.ver = S.ver;
+    D.lastTs = lastSeen;
     D.firstTs = D.pSeries.length ? D.pSeries[0][0] : ticks.length ? ticks[0][0] : null;
   }
   // Trophies after every saved battle, counted back from the reading that contains that battle.
@@ -717,7 +755,7 @@ section[data-tab] { display: grid; gap: 12px; }
         "</div>" +
         '<div class="hud-sub mt"><span>Level ' + fmt(p.exp) + "</span><span>Prestige " + fmt(p.prestige) + "</span><span>" + Object.keys(P.b || {}).length + " brawlers</span></div>" +
       "</div>" +
-      '<p class="note">Stats come from BrawlTime Ninja\'s public feed. Your server saves a reading every 30 minutes, and the app pulls a fresh one when you open it or tap the sync pill.</p>'
+      '<p class="note">Stats come from BrawlTime Ninja\'s public feed. Your server saves a reading every 15 minutes, and the app pulls a fresh one when you open it or tap the sync pill.</p>'
     );
   }
 
@@ -1117,8 +1155,17 @@ section[data-tab] { display: grid; gap: 12px; }
 
   async function boot() {
     try { S.ownerCode = localStorage.getItem("ownerCode") || null; } catch (e) {}
-    try { await loadData(true); }
-    catch (e) { showBanner("<b>Couldn't load your stats.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" }); }
+    const cached = await cacheGet();
+    if (cached && cached.v === CACHE_V && Array.isArray(cached.readings) && cached.readings.length) {
+      S.readings = cached.readings; S.battleRows = cached.battleRows || []; S.goals = cached.goals || [];
+      S.ver++; S.loaded = true; render();
+    }
+    try { await loadData(!S.readings.length); }
+    catch (e) {
+      showBanner(S.readings.length
+        ? "<b>Couldn't reach the server.</b> Showing the stats saved on this device."
+        : "<b>Couldn't load your stats.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" });
+    }
     S.loaded = true;
     render();
     const due = () => document.visibilityState === "visible" && !S.live.busy && Date.now() - Math.max(S.live.at, D ? D.lastTs : 0) > 10 * 60e3;

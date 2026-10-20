@@ -48,20 +48,43 @@ async function getFeedRetry(makeUrl: () => string) {
   }
 }
 
-// BrawlTime refreshes club lists only now and then (up to about an hour behind the game). With an official
-// Brawl Stars API key in the BS_API_KEY secret, the club comes straight from Supercell instead. Supercell keys
-// only work from fixed addresses, so requests go through RoyaleAPI's proxy (allow 45.79.218.79 on the key).
-async function getOfficialClub() {
+// Official Brawl Stars API, used when a key is saved in the BS_API_KEY secret. Supercell keys only work from
+// fixed addresses, so requests go through RoyaleAPI's proxy (allow 45.79.218.79 on the key).
+async function officialGet(path: string) {
   const key = Deno.env.get("BS_API_KEY");
   if (!key) return null;
-  const r = await fetch(`https://bsproxy.royaleapi.dev/v1/clubs/${encodeURIComponent("#" + CLUB)}`, {
+  const r = await fetch(`https://bsproxy.royaleapi.dev/v1${path}`, {
     headers: { Authorization: `Bearer ${key.trim()}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!r.ok) throw new Error(`Brawl Stars API answered ${r.status}`);
-  const d = await r.json();
+  return await r.json();
+}
+
+async function getOfficialClub() {
+  const d = await officialGet(`/clubs/${encodeURIComponent("#" + CLUB)}`);
+  if (d === null) return null;
   if (!d || !Array.isArray(d.members)) throw new Error("Brawl Stars API returned no club");
   return d;
+}
+
+// Club member lists (Supercell's own included) can trail the game by up to about an hour, while each
+// player's profile is live. With a key, read every member's profile and rebuild the total from those.
+async function liveMembers(club: any): Promise<Set<string>> {
+  const done = new Set<string>();
+  if (!Deno.env.get("BS_API_KEY")) return done;
+  const queue = club.members.slice();
+  const worker = async () => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const p = await officialGet(`/players/${encodeURIComponent("#" + m[0])}`);
+        if (p && typeof p.trophies === "number") { m[3] = p.trophies; done.add(m[0]); }
+      } catch (_e) { /* keep the club list's number for this member */ }
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  if (done.size) club.trophies = club.members.reduce((sum: number, m: any[]) => sum + (Number(m[3]) || 0), 0);
+  return done;
 }
 
 async function getClub(): Promise<{ data: any; src: string; officialError: string | null }> {
@@ -106,7 +129,7 @@ function compactClub(c: any, src: string) {
   };
 }
 
-// BrawlTime's club list lags; your own profile doesn't. Put your live trophies into your row and the total.
+// Club lists lag; your own profile doesn't. Put your live trophies into your row and the total.
 function patchMyRow(club: any, myTrophies: number) {
   const row = club.members.find((m: any[]) => m[0] === ME);
   if (!row || typeof myTrophies !== "number" || row[3] === myTrophies) return false;
@@ -126,11 +149,33 @@ function stable(v: unknown): string {
 
 const ms = (v: unknown) => (v ? new Date(String(v)).getTime() : 0);
 
-async function latest(column: "club") {
-  const { data, error } = await sb.from("readings").select(`${column}, ts`).not(column, "is", null)
-    .order("ts", { ascending: false }).order("id", { ascending: false }).limit(1);
+// Club lists are saved in full (club column) when the members or club details change; otherwise only the
+// members whose trophies moved go in club_upd ({d:1, trophies, upd:[[tag, trophies]]}). The full current
+// list lives in settings.
+async function clubFull(): Promise<any> {
+  const saved = await getSetting("club_full");
+  if (saved) return JSON.parse(saved);
+  const { data, error } = await sb.from("readings").select("club, club_upd").or("club.not.is.null,club_upd.not.is.null")
+    .order("ts", { ascending: true }).order("id", { ascending: true });
   if (error) throw error;
-  return data?.[0] ?? null;
+  let full: any = null;
+  for (const r of data ?? []) full = applyClub(full, r.club ?? r.club_upd);
+  return full;
+}
+function applyClub(base: any, c: any) {
+  if (!c?.d) return c;
+  if (!base) return null;
+  const upd = new Map((c.upd ?? []).map((u: any[]) => [u[0], u[1]]));
+  return { ...base, trophies: c.trophies, members: base.members.map((m: any[]) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0])] : m)) };
+}
+function clubChange(full: any, club: any) {
+  const same = (a: any, b: any) => stable(a) === stable(b);
+  const details = (c: any) => [c.name, c.tag, c.req, c.type, c.desc, c.src, c.members.map((m: any[]) => [m[0], m[1], m[2]]).sort()];
+  if (!full || !same(details(full), details(club))) return club;
+  const old = new Map(full.members.map((m: any[]) => [m[0], m[3]]));
+  const upd = club.members.filter((m: any[]) => old.get(m[0]) !== m[3]).map((m: any[]) => [m[0], m[3]]);
+  if (!upd.length && full.trophies === club.trophies) return null;
+  return { d: 1, trophies: club.trophies, upd };
 }
 
 async function getSetting(key: string) {
@@ -192,25 +237,27 @@ async function refresh(src: string) {
       if (Object.keys(delta).length) { row.brawlers = delta; newFull = { ...full, ...delta }; }
     }
   }
-  let patched = false;
+  let patched = false, live = 0, newClub: any = null;
   if (cr.status === "fulfilled") {
     const club = compactClub(cr.value.data, cr.value.src);
-    if (club.src === "brawltime" && typeof row.trophies === "number") patched = patchMyRow(club, row.trophies as number);
+    const fresh = await liveMembers(club);
+    live = fresh.size;
+    if (!fresh.has(ME) && typeof row.trophies === "number") patched = patchMyRow(club, row.trophies as number);
     row.club_trophies = club.trophies;
-    const prev = await latest("club");
-    if (!prev || stable(prev.club) !== stable(club)) row.club = club;
+    const change = clubChange(await clubFull(), club);
+    if (change) { if (change.d) row.club_upd = change; else row.club = change; newClub = club; }
   }
   const result = {
     ok: true, ts: now, trophies: (row.trophies as number) ?? null, club_trophies: (row.club_trophies as number) ?? null,
-    battles_seen: saved, stored_brawlers: "brawlers" in row, stored_club: "club" in row,
-    club_source: cr.status === "fulfilled" ? cr.value.src : null, club_patched: patched,
+    battles_seen: saved, stored_brawlers: "brawlers" in row, stored_club: "club" in row ? "full" : "club_upd" in row ? "update" : false,
+    club_source: cr.status === "fulfilled" ? cr.value.src : null, club_live_members: live, club_patched: patched,
     official_error: cr.status === "fulfilled" ? cr.value.officialError : null,
     player_error: pr.status === "rejected" ? String(pr.reason?.message ?? pr.reason) : null,
     club_error: cr.status === "rejected" ? String(cr.reason?.message ?? cr.reason) : null,
   };
   // Nothing moved since the last reading: mark that reading as confirmed now instead of adding a copy.
   const unchanged = !!last && pr.status === "fulfilled" && cr.status === "fulfilled" && !stale &&
-    !("brawlers" in row) && !("club" in row) && row.trophies === last.trophies && row.club_trophies === last.club_trophies &&
+    !("brawlers" in row) && !newClub && row.trophies === last.trophies && row.club_trophies === last.club_trophies &&
     ms(row.nb) === ms(last.nb) && stable(row.player) === stable(last.player);
   if (unchanged) {
     const { error } = await sb.from("readings").update({ checked: now }).eq("id", last!.id);
@@ -221,6 +268,10 @@ async function refresh(src: string) {
   if (error) throw error;
   if (newFull) {
     const { error: setErr } = await sb.from("settings").upsert({ key: "brawlers_full", value: JSON.stringify(newFull) });
+    if (setErr) throw setErr;
+  }
+  if (newClub) {
+    const { error: setErr } = await sb.from("settings").upsert({ key: "club_full", value: JSON.stringify(newClub) });
     if (setErr) throw setErr;
   }
   return result;

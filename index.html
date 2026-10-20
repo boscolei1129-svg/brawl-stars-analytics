@@ -430,7 +430,7 @@ section[data-tab] { display: grid; gap: 12px; }
     return j;
   }
   const mapGoal = (g) => ({ id: g.id, kind: g.kind, target: g.target, brawler: g.brawler, start: g.start, created: msOf(g.created_at) });
-  const READ_COLS = "id,ts,checked,nb,src,trophies,club_trophies,player,brawlers,club";
+  const READ_COLS = "id,ts,checked,nb,src,trophies,club_trophies,player,brawlers,club,club_upd";
   // A copy of everything already downloaded is kept on this device, so the app opens instantly
   // and only asks the server for what's new.
   const CACHE_V = 1;
@@ -479,11 +479,17 @@ section[data-tab] { display: grid; gap: 12px; }
   }
 
   // ---------- derive ----------
+  function applyClub(base, c) {
+    if (!c.d) return c;
+    if (!base) return null;
+    const upd = new Map((c.upd || []).map((u) => [u[0], u[1]]));
+    return Object.assign({}, base, { trophies: c.trophies, members: base.members.map((m) => (upd.has(m[0]) ? [m[0], m[1], m[2], upd.get(m[0])] : m)) });
+  }
   function derive() {
     if (D && D.ver === S.ver) return;
     const rs = S.readings.slice().sort((a, b) => msOf(a.ts) - msOf(b.ts) || a.id - b.id);
     const ticks = [], ps = [], cs = [];
-    let curB = null, lastSeen = 0;
+    let curB = null, curC = null, lastSeen = 0;
     for (const r of rs) {
       const ts = msOf(r.ts), nb = msOf(r.nb), ck = msOf(r.checked);
       lastSeen = Math.max(lastSeen, ts, ck || 0);
@@ -495,7 +501,8 @@ section[data-tab] { display: grid; gap: 12px; }
         if (ck && ck > ts) ticks.push([ck, r.trophies, r.club_trophies, nb]);
       }
       if (r.player) ps.push({ ts, nb, p: r.player, b: curB || {} });
-      if (r.club) cs.push({ ts, c: r.club });
+      // Club lists are saved in full when members or details change, otherwise only the members whose trophies moved.
+      if (r.club || r.club_upd) { curC = applyClub(curC, r.club || r.club_upd); if (curC) cs.push({ ts, c: curC }); }
     }
     const battles = S.battleRows.map((b) => ({ t: msOf(b.t), m: b.mode, map: b.map, r: b.result, w: b.win, tc: b.tc, br: b.brawler, rk: !!b.ranked }))
       .filter((b) => !isNaN(b.t)).sort((a, b) => b.t - a.t);

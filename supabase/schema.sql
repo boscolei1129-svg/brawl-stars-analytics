@@ -12,7 +12,8 @@ create table public.readings (
   player jsonb,
   brawlers jsonb,                 -- only the brawlers that changed since the previous list
   club jsonb,
-  checked timestamptz             -- last time a refresh found nothing new and confirmed this reading
+  checked timestamptz,            -- last time a refresh found nothing new and confirmed this reading
+  club_upd jsonb                  -- between full club lists: only the members whose trophies moved
 );
 create index readings_ts_idx on public.readings (ts desc);
 
@@ -41,7 +42,7 @@ create table public.settings (
   key text primary key,
   value text not null
 );
--- settings also holds 'brawlers_full' (the full current brawler list), written by the function.
+-- settings also holds 'brawlers_full' and 'club_full' (the current full lists), written by the function.
 -- insert into public.settings values ('owner_code_sha256', encode(sha256(convert_to('YOURCODE', 'UTF8')), 'hex'));
 
 alter table public.readings enable row level security;

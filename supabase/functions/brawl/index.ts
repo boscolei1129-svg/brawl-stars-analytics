@@ -1,7 +1,7 @@
 // Brawl Stars Analytics server function. Every profile is a player tag (plus the club it follows);
 // requests name it with `tag` (no #). Requests without one mean the original profile, LEGACY.
 //   POST {action:"profile_lookup", tag, club?}     check a player (and club) before adding: name, icon, trophies
-//   POST {action:"profile_add", tag, device, club?, from?}  start tracking a new profile (game stats are public); each device can start PER_DEVICE
+//   POST {action:"profile_add", tag, device, club?}  start tracking a new profile (game stats are public); each device can start PER_DEVICE
 //   POST {action:"profile_release", tag, device}   this device no longer holds the profile it started (it pauses when nobody holds it)
 //   POST {action:"refresh", tag, src?:"auto"|"live"}  fetch fresh stats, save a reading and new battles
 // Goals and alerts are private to a device. Each device sends `device`, a random secret it made itself; devices
@@ -1065,8 +1065,6 @@ async function handle(req: Request): Promise<Response> {
       }
       case "profile_add": {
         if (!TAG_RE.test(tag)) return fail("bad_tag");
-        // Which way people come to tracking (Explore or the home screen): counted per hour, no identifiers.
-        const via = body.from === "explore" ? "explore" : "home";
         const existing = await getProfile(tag);
         if (existing) {
           // Already tracked (someone else added it): this device just saves it. A profile that was set to some
@@ -1084,7 +1082,6 @@ async function handle(req: Request): Promise<Response> {
           }
           if (!existing.follow && body.club === undefined) patch.follow = true;
           if (Object.keys(patch).length) await sb.from("profiles").update(patch).eq("tag", tag);
-          use("track:" + (existing.active ? "save" : "wake") + ":" + via);
           return json({ ok: true, exists: true, profile: publicProfile({ ...existing, ...patch }) });
         }
         const owner = await ownerOf(body.device, ip, true);
@@ -1100,8 +1097,7 @@ async function handle(req: Request): Promise<Response> {
         const claim = await claimSlot(owner, tag, row);
         const bad = slotFail(claim);
         if (bad) return bad;
-        if (claim.status === "exists") { use("track:save:" + via); return json({ ok: true, exists: true, profile: publicProfile((await getProfile(tag)) ?? row) }); }
-        use("track:new:" + via);
+        if (claim.status === "exists") return json({ ok: true, exists: true, profile: publicProfile((await getProfile(tag)) ?? row) });
         // First reading now, so the dashboard has something to show straight away.
         let first: unknown = null;
         try { first = await refresh("live", row); } catch (e) { first = { error: String((e as Error)?.message ?? e) }; }

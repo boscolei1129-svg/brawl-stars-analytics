@@ -891,24 +891,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
   .xhist .hr { grid-template-columns: 96px minmax(0, 1fr) 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .xp, .xvs-mark { animation: none; } }
-/* Explore first: the stronger tracking nudge, and the line under "since you last looked" */
-.xtrack.keen { border-color: rgba(255, 122, 26, 0.5); background: linear-gradient(180deg, rgba(255, 122, 26, 0.09), rgba(255, 122, 26, 0) 60%), var(--surface); }
-.xgap { color: var(--fg-2); }
-.xgap .link { font-size: inherit; padding: 0; min-height: 0; vertical-align: baseline; }
 
-
-.art-explore .bar rect:first-child { fill: var(--bg); stroke: rgba(39, 211, 195, 0.55); }
-.art-explore .bar circle, .art-explore .bar path { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linecap: round; }
-.art-explore .bar text { fill: var(--fg); font: 700 13px var(--font-num); letter-spacing: 0.5px; }
-.art-explore .bar text { clip-path: inset(0 100% 0 0); animation: typeIn 0.8s steps(10, end) 0.15s forwards; }
-@keyframes typeIn { to { clip-path: inset(0 0 0 0); } }
-.art-explore .caret { fill: var(--accent); animation: blink 1s steps(1) infinite; }
-.art-explore .res { opacity: 0; animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-.art-explore .rw { fill: var(--surface); stroke: var(--line-2); }
-.art-explore .av { fill: var(--line); }
-.art-explore .nm { fill: #3a414d; }
-.art-explore .val { fill: var(--teal); opacity: 0.8; }
-@media (prefers-reduced-motion: reduce) { .art-explore .bar text { clip-path: none; animation: none; } .art-explore .res { opacity: 1; animation: none; } .art-explore .caret { animation: none; } }
 </style>
 </head>
 <body>
@@ -2181,7 +2164,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
         "<b>For each tracked player:</b> their public game stats (tag, name, trophies, brawlers, battles and club). Anyone using the app can see them, as in the game.",
         "<b>For this device:</b> a random key made on this device, your goals, your alert settings and the address your browser uses for notifications. Only this device, and devices you link, can see or change them.",
         "To stop abuse, the server counts requests from each network address. The counts are scrambled and deleted within two days.",
-        "<b>Explore:</b> looking up a player or club keeps a public copy of their game data on the server for up to a day (so many lookups cost one call to the game), and counts lookups per hour with no identifiers. It doesn\'t track them or you. Favourites, recent lookups, when you last opened each player (for a week) and \u201csince you last looked\u201d snapshots stay on this device.",
+        "<b>Explore:</b> looking up a player or club keeps a public copy of their game data on the server for up to a day (so many lookups cost one call to the game), and counts lookups per hour with no identifiers. It doesn\'t track them or you. Favourites, recent lookups and \u201csince you last looked\u201d snapshots stay on this device.",
         "No accounts, names, emails, passwords, location, ads or tracking. Things like your last tab stay on this device."]) +
       sec("Keeping and removing", [
         "Each device can start tracking 2 players (50 across the app). Removing a player you started frees your spot; if no other device started them, they pause and their history is kept.",
@@ -2442,7 +2425,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
   const canCloseHome = () => !!ME && PROFILES.list().some((p) => p.tag === ME);
   function showHome(opts) {
     opts = opts || {};
-    H.open = true; H.edit = false; H.err = ""; H.note = opts.note || ""; H.from = opts.from || "home";
+    H.open = true; H.edit = false; H.err = ""; H.note = opts.note || "";
     if (opts.prefill) { H.q = opts.prefill; }
     const el = $("#home");
     el.innerHTML = homeShell();
@@ -2577,8 +2560,8 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       box.innerHTML = '<div class="pv-wait big"><i></i><span>' + (L.tracked ? "Saving " + esc(L.player.name) + "…" : "Setting up " + esc(L.player.name) + ". Reading their stats" + (H.clubMode === "none" ? "" : " and club") + ", which takes about 15 seconds the first time.") + '</span></div><div class="pv-bar"><i></i></div>';
       return;
     }
-    box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this device" : "Track for history") + "</button>" +
-      '<div class="hint">' + (L.tracked ? "" : "Saves their stats every 15 minutes for charts, club activity, goals and alerts. ") + "Goals and alerts you set stay private to this device." + (L.tracked ? "" : " Each device can start tracking 2 players.") + "</div>" +
+    box.innerHTML = '<button class="btn wide" data-home="add"' + (readyToAdd() ? "" : " disabled") + ">" + (L.tracked ? "Add to this device" : "Start tracking") + "</button>" +
+      '<div class="hint">' + (L.tracked ? "" : "Game stats are public, so anyone can follow any player. ") + "Goals and alerts you set stay private to this device." + (L.tracked ? "" : " Each device can start tracking 2 players.") + "</div>" +
       (H.err ? '<div class="pv-err" role="alert">' + esc(H.err) + "</div>" : "");
   }
   let lookT = null, lookSeq = 0, clubT = null, clubSeq = 0;
@@ -2627,7 +2610,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
   async function addProfile() {
     const L = H.look;
     if (!L || H.busy || !readyToAdd()) return;
-    const tag = L.player.tag, body = { action: "profile_add", tag, from: H.from === "explore" ? "explore" : "home" };
+    const tag = L.player.tag, body = { action: "profile_add", tag };
     if (!L.tracked) {
       if (H.clubMode === "none") body.club = "";
       else if (H.clubMode === "other") body.club = H.clubLook.tag;
@@ -2746,16 +2729,8 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     shield: '<path d="M8 1.8l5 2v4c0 3.2-2.2 5.4-5 6.4-2.8-1-5-3.2-5-6.4v-4l5-2Z"/><path d="M8 5.5v3.2M8 10.8v.1"/>',
   };
   const TOUR = [
-    { k: "Explore", t: "Look up anyone",
-      b: "Type any player or club tag to see their profile, brawlers and recent battles, compare two players or scout a club. No sign-up, and nothing is saved about them.",
-      art: `<svg class="art-explore" viewBox="0 0 280 150" aria-hidden="true">
-        <g class="bar"><rect x="14" y="10" width="252" height="30"/><circle cx="32" cy="25" r="6.5"/><path d="M37 30l5 5"/>
-          <text x="50" y="30">#8YRJ090Q2</text><rect class="caret" x="142" y="17" width="2" height="16"/></g>
-        ${[0, 1, 2].map((i) => `<g transform="translate(14 ${52 + i * 32})"><g class="res" style="animation-delay:${0.9 + i * 0.16}s">
-          <rect class="rw" width="252" height="26"/><rect class="av" x="6" y="5" width="16" height="16"/><rect class="nm" x="30" y="10" width="${[70, 52, 84][i]}" height="6"/>
-          <rect class="val" x="${[196, 206, 190][i]}" y="10" width="${[48, 38, 54][i]}" height="6"/></g></g>`).join("")}</svg>` },
-    { k: "Every 15 minutes", t: "Track a player for history",
-      b: "When you want more than today's numbers, track a player. The app checks the game every 15 minutes, even while it's closed, building their trophy chart, win rate, brawlers and their club's activity.",
+    { k: "Every 15 minutes", t: "Your trophies, saved for you",
+      b: "The app checks the game every 15 minutes, even while it's closed, so your trophy chart, win rate, modes, maps and brawlers keep building on their own.",
       art: `<svg class="art-chart" viewBox="0 0 280 150" aria-hidden="true">
         <defs><linearGradient id="tcF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27d3c3" stop-opacity="0.35"/><stop offset="1" stop-color="#27d3c3" stop-opacity="0"/></linearGradient></defs>
         <g class="grid"><path d="M10 40H270M10 80H270M10 120H270"/></g>
@@ -2763,6 +2738,15 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         <path class="line" pathLength="1" d="M10 118 L48 110 L82 112 L116 92 L150 96 L184 70 L218 62 L252 38"/>
         <circle class="dot" cx="252" cy="38" r="5"/><circle class="ping" cx="252" cy="38" r="5"/>
         <g class="chip"><rect x="196" y="6" width="58" height="22"/><text x="225" y="21">+126</text></g></svg>` },
+    { k: "Your club", t: "See your club live",
+      b: "The member board shows who's climbing. Activity shows who has played recently and a 24-hour timeline of when everyone plays, worked out from battles because the game doesn't share who's online.",
+      art: `<svg class="art-club" viewBox="0 0 280 150" aria-hidden="true">
+        ${[0, 1, 2, 3].map((i) => `<g class="row r${i}" transform="translate(0 ${12 + i * 34})">
+          <rect class="av" x="8" y="0" width="22" height="22"/>${i === 1 ? '<circle class="on" cx="38" cy="11" r="3.5"/>' : ""}
+          <rect class="nm" x="${i === 1 ? 46 : 40}" y="4" width="${[54, 40, 62, 46][i]}" height="6"/>
+          <rect class="track" x="112" y="7" width="160" height="9"/>
+          ${[[[118, 22], [190, 30]], [[150, 46], [236, 20]], [[128, 18]], [[170, 24], [214, 36]]][i].map(([x, w], j) => `<rect class="blk${i === 1 && j === 1 ? " live" : ""}" x="${x}" y="8" width="${w}" height="7" style="animation-delay:${0.25 + i * 0.12 + j * 0.1}s"/>`).join("")}
+          <rect class="now" x="246" y="2" width="2" height="19"/></g>`).join("")}</svg>` },
     { k: "Goals and alerts", t: "Set goals, get alerts",
       b: "Pick a trophy target and see when you'll reach it. Turn on alerts for goals, milestones, members joining or leaving, and a daily recap at the time you choose.",
       note: "On iPhone, add the app to your Home Screen first (Share, then Add to Home Screen). Alerts need it.",
@@ -2795,7 +2779,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   function paintTour() {
     const s = TOUR[T.i], last = T.i === TOUR.length - 1, box = $("#tourBody");
     if (!box) return;
-    const finish = T.replay && ME ? "Done" : T.replay ? "Got it" : "Start exploring";
+    const finish = T.replay && ME ? "Done" : T.replay ? "Got it" : "Add a player";
     box.innerHTML = `<div class="tour-top"><span class="tour-k">${s.k}</span><span class="tour-n">${T.i + 1} of ${TOUR.length}</span>
         ${last ? "" : '<button class="link tour-skip" data-tour="skip">Skip</button>'}</div>
       <div class="tour-page ${T.dir > 0 ? "from-r" : "from-l"}">
@@ -2824,7 +2808,6 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     el.classList.add("leaving");
     setTimeout(() => {
       el.remove();
-      if (!T.replay && !PROFILES.list().length) { xLand(); return; }
       if (H.open) { const i = $("#hTag"); if (i && !T.replay) i.focus(); }
       else document.documentElement.classList.remove("homeopen");
     }, REDUCED() ? 0 : 280);
@@ -2864,7 +2847,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   // and that's it. This device remembers recent lookups, favourites and a small snapshot per player, so a return
   // visit can say what changed ("since you last looked").
   // Routes live in the address: #explore, #explore/p/TAG, #explore/vs/TAG/TAG, #explore/club/TAG.
-  const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {}, visits: {} };
+  const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {} };
   const XI = {
     vs: '<path d="M2.5 2.5l8 8M13.5 2.5l-8 8M3.5 9.5l3 3M12.5 9.5l-3 3M2 14l2.6-2.6M14 14l-2.6-2.6"/>',
     club: '<path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.2-5.2 6.3-3-1.1-5.2-3.3-5.2-6.3V3.8L8 1.8Z"/><path d="M5.6 8.2l1.7 1.7 3.2-3.4"/>',
@@ -2969,7 +2952,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     X.state[key] = { busy: true };
     xFetch(kind, tag).then((r) => {
       X.state[key] = { r, at: Date.now() };
-      if (kind === "p") { X.since[tag] = xSince(r.player); X.visits[r.player.tag] = xVisit(r.player.tag); xRemember("p", r.player.tag, r.player.name, r.player.icon); }
+      if (kind === "p") { X.since[tag] = xSince(r.player); xRemember("p", r.player.tag, r.player.name, r.player.icon); }
       else xRemember("c", r.club.tag, r.club.name, r.club.badge);
     }).catch((e) => { X.state[key] = { err: xErr(e, kind, tag), at: Date.now() }; })
       .then(() => { if (X.open) { paintX(); if (X.pendingFocus === "battles" && kind === "p") { X.pendingFocus = null; const s = $("#xBattles"); if (s) s.scrollIntoView({ block: "start" }); } } });
@@ -3006,25 +2989,6 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     for (const t of idx.slice(40)) { try { localStorage.removeItem("xsnap:" + t); } catch (e) {} }
     xWrite("xsnaps", idx.slice(0, 40));
     return { prev, cur: xSnapOf(p) };
-  }
-
-  // How many separate visits (30 minutes apart) this device made to a player in the last week. Only used to decide
-  // when to suggest tracking; kept for 40 players at most.
-  function xVisit(tag) {
-    const now = Date.now(), m = xRead("xvisits", {});
-    const a = (Array.isArray(m[tag]) ? m[tag] : []).filter((t) => now - t < 7 * DAY);
-    if (!a.length || now - a[a.length - 1] > 30 * 60e3) a.push(now);
-    m[tag] = a.slice(-20);
-    const keys = Object.keys(m);
-    if (keys.length > 40) { keys.sort((x, y) => (m[x][m[x].length - 1] || 0) - (m[y][m[y].length - 1] || 0)); for (const k of keys.slice(0, keys.length - 40)) delete m[k]; }
-    xWrite("xvisits", m);
-    return a.length;
-  }
-  // Landing on Explore (a device with no players saved): the address says #explore, with nothing to go back to.
-  function xLand() {
-    try { history.replaceState(null, "", location.pathname + location.search + "#explore"); } catch (e) {}
-    X.pushed = 0;
-    xShow({ v: "home" });
   }
 
   // ----- battle maths (only what the game's battle log really says) -----
@@ -3071,8 +3035,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const kindSeg = '<div class="seg" role="group" aria-label="Look up">' + [["p", "Player"], ["c", "Club"]].map(([v, l]) => '<button type="button" data-xkind="' + v + '" aria-pressed="' + (X.kind === v) + '">' + l + "</button>").join("") + "</div>";
     const left = '<div>' +
       '<h1 class="xp-h" tabindex="-1" data-xh>Explore<span>.</span></h1>' +
-      '<p class="xp-lede">' + (mine.length ? "Look up any player or club, compare two players, and see their recent battles. Nothing is tracked, and it doesn\'t use a tracking spot."
-        : "Look up any player or club, compare two players, and see their recent battles. No sign-up, and nothing is saved about them.") + "</p>" +
+      '<p class="xp-lede">Look up any player or club, compare two players, and see their recent battles. Nothing is tracked, and it doesn\'t use a tracking spot.</p>' +
       '<form class="xp-search" id="xSearch" novalidate>' +
         '<div class="ctrls" style="margin:0">' + kindSeg + '<span class="k-label">No sign-up</span></div>' +
         '<div class="row2"><label class="tagfield" for="xQ"><span class="hash" aria-hidden="true">#</span><input id="xQ" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="' + (X.kind === "c" ? "Club tag" : "Player tag") + '" aria-label="' + (X.kind === "c" ? "Club tag" : "Player tag") + '" aria-describedby="xQHint" value="' + esc(X.q || "") + '"></label>' +
@@ -3090,7 +3053,6 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       (fav.length ? '<div class="xsec-h"><h2>Favourites</h2></div><div class="xchips">' + fav.map(chip).join("") + "</div>" : "") +
       (recent.length ? '<div class="xsec-h"><h2>Recent</h2><button class="link" data-xclear>Clear</button></div><div class="xchips">' + recent.map(chip).join("") + "</div>" : "") +
       (!fav.length && !recent.length ? '<div class="card"><h2>Tip</h2><div class="sub">Star a player or club to keep them here. Next time you open them, you\'ll see what changed since you last looked. That stays on this device.</div></div>' : "") +
-      (mine.length ? "" : '<div class="card xtrack"><h2>Want history?</h2><p>Track a player and the app checks the game every 15 minutes, even while it\'s closed: trophy charts, club activity, goals and alerts. Each device can start tracking 2 players.</p><button class="btn" data-xaddform>Track a player</button></div>') +
       '<div class="xsoon">' + xsvg("card") + "<span><b>Coming next: share cards.</b> Turn a player, a head-to-head or a battle recap into an image to send to friends.</span></div>" +
       "</div>";
     return '<div class="xhome">' + left + right + "</div>";
@@ -3117,12 +3079,11 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const stats = '<div class="card"><h2>Profile</h2><div class="xstat3">' +
         '<div><span class="k">3v3 wins</span><span class="v">' + fmt(p.v3) + '</span></div><div><span class="k">Solo wins</span><span class="v">' + fmt(p.solo) + '</span></div><div><span class="k">Duo wins</span><span class="v">' + fmt(p.duo) + "</span></div></div>" +
       '<div class="xstat3" style="margin-bottom:0"><div><span class="k">Brawlers</span><span class="v">' + b.length + '</span><span class="n">unlocked</span></div><div><span class="k">Power 11</span><span class="v">' + p11 + '</span><span class="n">of ' + b.length + '</span></div><div><span class="k">Gear</span><span class="v">' + fmt(b.reduce((a, x) => a + (x.g || 0) + (x.sp || 0) + (x.gear || 0), 0)) + '</span><span class="n">gadgets, SPs, gears</span></div></div></div>';
-    const visits = X.visits[p.tag] || 0, keen = !saved && (visits >= 3 || fav);
-    const left = '<div>' + hero + (keen ? xTrackCard(p, r, visits) : "") + xSinceCard(p, !saved && !keen) + stats + xTopBrawlers(p) + (saved || keen ? "" : xTrackCard(p, r)) + "</div>";
+    const left = '<div>' + hero + xSinceCard(p) + stats + xTopBrawlers(p) + (saved ? "" : xTrackCard(p, r)) + "</div>";
     const right = '<div>' + xBattlesCard(p) + "</div>";
     return '<div class="xcols">' + left + right + "</div>";
   }
-  function xSinceCard(p, pitch) {
+  function xSinceCard(p) {
     const s = X.since[p.tag];
     if (!s) return "";
     if (!s.prev) return '<div class="card xsince"><h2>Since you last looked</h2><div class="sub">First look at ' + esc(p.name) + " on this device. Come back later to see what changed. " + (isFav("p", p.tag) ? "" : "Star them to keep them handy.") + "</div></div>";
@@ -3137,8 +3098,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     for (const [k, d] of gains) add(esc(title(k)), d);
     return '<div class="card xsince"><h2>Since you last looked<span class="sp"></span><span class="aside">' + esc(ago(a.at)) + "</span></h2>" +
       (items.length ? "<ul>" + items.join("") + "</ul>" : '<div class="sub">No change since ' + esc(dtShort(a.at)) + ".</div>") +
-      '<div class="xnote">Compared with what this device saw on ' + esc(dtShort(a.at)) + ". Kept on this device only.</div>" +
-      (pitch && c.t !== a.t ? '<div class="xnote xgap">Explore only sees these two moments. <button class="link" data-xtrack="' + esc(p.tag) + '">Track ' + esc(p.name) + "</button> to see when each change happened, battle by battle.</div>" : "") + "</div>";
+      '<div class="xnote">Compared with what this device saw on ' + esc(dtShort(a.at)) + ". Kept on this device only.</div></div>";
   }
   function xTopBrawlers(p) {
     const b = (p.brawlers || []).slice().sort((x, y) => (y.tr || 0) - (x.tr || 0));
@@ -3148,18 +3108,8 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       b.slice(0, n).map((x) => '<div class="xbar"><div class="nm"><span class="mono' + ((x.power || 0) >= 11 ? " p11" : "") + '">' + art(ART_BR(x.id)) + esc(initials(title(x.name))) + (x.power ? '<span class="pow">' + x.power + "</span>" : "") + "</span><span>" + esc(title(x.name)) + '</span></div><div class="end">' + fmt(x.tr) + " · peak " + fmt(x.hi) + '</div><div class="meter hot"><i style="width:' + Math.max(2, Math.round(((x.tr || 0) / max) * 100)) + '%"></i></div></div>').join("") +
       (b.length > 8 ? '<button class="xmore" data-xmore="' + esc(k) + '">' + (X.more[k] ? "Show top 8" : "Show all " + b.length) + "</button>" : "") + "</div>";
   }
-  // The tracking pitch. With `visits` (or a star) it's the stronger version near the top, saying why it's shown.
-  function xTrackCard(p, r, visits) {
-    const paused = r.tracked && r.active === false, free = r.tracked && !paused;
-    if (visits != null) {
-      const s = X.since[p.tag], d = s && s.prev ? (s.cur.t || 0) - (s.prev.t || 0) : 0;
-      const why = visits >= 3 ? "You\'ve looked at " + esc(p.name) + " " + visits + " times this week. " : "You starred " + esc(p.name) + ". ";
-      const gap = d ? "Trophies are " + (d > 0 ? "up " : "down ") + fmt(Math.abs(d)) + " since " + esc(dtShort(s.prev.at)) + ", but Explore only sees those two moments. " : "";
-      return '<div class="card xtrack keen"><h2>' + (visits >= 3 ? "You keep coming back" : "Keep their history") + "</h2><p>" + why + gap + (free
-        ? esc(p.name) + " is already tracked in the app, so adding them to My stats is free and doesn\'t use one of your spots."
-        : "Track them and the app saves their stats every 15 minutes, so you see every change, not just today\'s numbers. Each device can start tracking 2 players.") +
-        '</p><button class="btn" data-xtrack="' + esc(p.tag) + '">' + (free ? "Add to My stats" : "Track " + esc(p.name)) + "</button></div>";
-    }
+  function xTrackCard(p, r) {
+    const paused = r.tracked && r.active === false;
     return '<div class="card xtrack"><h2>Want history?</h2><p>' + (r.tracked && !paused
       ? esc(p.name) + " is already tracked in the app, so adding them to My stats is free: trophy history every 15 minutes, club activity, goals and alerts."
       : "Explore shows what the game shares right now. Tracking " + esc(p.name) + " saves their stats every 15 minutes for charts, club activity, goals and alerts. Each device can start tracking 2 players.") +
@@ -3337,7 +3287,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       // Already tracked: saving it to this device is free.
       X.msg[tag] = { t: "Adding to My stats…" }; paintX();
       try {
-        const res = await callFn({ action: "profile_add", tag, from: "explore" });
+        const res = await callFn({ action: "profile_add", tag });
         PROFILES.upsert(cardOf(res.profile));
         xOpen(tag);
       } catch (e) {
@@ -3348,7 +3298,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     }
     // Not tracked (or paused): the usual add form, with the club choice and the per-device limit explained.
     xClose();
-    showHome({ prefill: tag, from: "explore" });
+    showHome({ prefill: tag });
   }
   function xOpen(tag) {
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
@@ -3383,7 +3333,6 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     }
     if ("xclear" in d) { xWrite("xrecent", []); paintX(); return; }
     if (d.xtrack) { xTrack(d.xtrack); return; }
-    if (t.hasAttribute("data-xaddform")) { xClose(); showHome({ from: "explore" }); const i = $("#hTag"); if (i) i.focus(); return; }
     if (d.xopen) { xOpen(d.xopen); return; }
     if (d.xopenclub) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} location.href = "./?p=" + encodeURIComponent(d.xopenclub) + "#club"; return; }
     if ("xswap" in d) { const a = $("#xA"), b = $("#xB"); if (a && b) { const v = a.value; a.value = b.value; b.value = v; } return; }
@@ -3406,7 +3355,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const replayWelcome = new URLSearchParams(location.search).has("welcome");
     if (replayWelcome) { try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {} }
     const xr = xParse(location.hash);
-    if (!start) { $("#skel").hidden = true; showHome(); if (xr) { xShow(xr); return; } if (!lsGet("welcomed") || replayWelcome) { showIntro(); return; } xLand(); return; } // no players on this device
+    if (!start) { $("#skel").hidden = true; showHome(); if (xr) { xShow(xr); return; } if (!lsGet("welcomed") || replayWelcome) showIntro(); return; } // first time on this device
     if (replayWelcome) setTimeout(showIntro, 0);
     ME = start;
     const card = PROFILES.list().find((p) => p.tag === ME) || {};

@@ -142,16 +142,6 @@ function api() {
     ok("counter down: goals still work on a known device (no API cost)", g.ok, g);
     ok("counter failures are counted", db.T.usage_counters.some((x) => x.key === "limit_error:closed") && db.T.usage_counters.some((x) => x.key === "limit_error:open"));
   }
-  // ---- which way people come to tracking (Explore or the home screen) ----
-  {
-    const A = api();
-    const { db, call } = load(FILE, { fetch: A.fetch });
-    const n1 = await call({ action: "profile_add", tag: "2PPLYQ2C", device: dev(), from: "explore" }, freshIp());
-    const s1 = await call({ action: "profile_add", tag: "2PPLYQ2C", device: dev() }, freshIp());
-    const n2 = await call({ action: "profile_add", tag: "9GQRUJ2Y", device: dev(), from: "<script>" }, freshIp());
-    const u = Object.fromEntries(db.T.usage_counters.map((x) => [x.key, x.n]));
-    ok("adds are counted by where they started, nothing else (unknown sources count as home)", n1.created && s1.exists && n2.created && u["track:new:explore"] === 1 && u["track:save:home"] === 1 && u["track:new:home"] === 1 && !Object.keys(u).some((k) => /2PPLYQ2C|9GQRUJ2Y|script/.test(k)), u);
-  }
   // ---- two adds at the same moment can't both take the last spot ----
   {
     const A = api();

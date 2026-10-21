@@ -3145,7 +3145,11 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         { duration: 150, easing: "cubic-bezier(0.55, 0, 1, 0.45)", fill: "forwards" });
       const a2 = f2.animate([{ transform: "perspective(260px) rotateX(90deg)", filter: "brightness(1.4)" }, { transform: "perspective(260px) rotateX(0deg)", filter: "brightness(1)" }],
         { duration: 180, delay: 150, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.3)", fill: "backwards" });
-      a2.finished.catch(() => {}).then(() => { bot.innerHTML = b; f1.remove(); f2.remove(); t.classList.toggle("blank", blank); done(); });
+      // Finishes on the animation's end, or after 700 ms if the page isn't being drawn (animations then never end).
+      let over = false;
+      const fin = () => { if (over) return; over = true; bot.innerHTML = b; f1.remove(); f2.remove(); t.classList.toggle("blank", blank); done(); };
+      a2.finished.catch(() => {}).then(fin);
+      setTimeout(fin, 700);
     }, delay));
   }
   function flipTo(next) {

@@ -725,7 +725,24 @@ html.xpopen, html.xpopen body { overflow: hidden; }
 .xp-crumb { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--teal); }
 .xp-body { display: grid; gap: 12px; padding-top: 6px; }
 .xp-h { margin: 8px 0 0; font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: 0.5px; outline: none; }
-.xp-h span { color: var(--teal); }
+/* The heading's split-flap board (Explore. / Discover. / Track.). Sized to its column: 9 tiles fill the width up to 52px letters. */
+.xp-h { container-type: inline-size; }
+.xsr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.xflip { display: flex; gap: 0.07em; font-size: min(52px, 11vw); font-size: min(52px, 12.9cqw); line-height: 1; font-weight: 700; letter-spacing: 0; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.ft { position: relative; flex: none; width: 0.78em; height: 1.2em; }
+.fh { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; background: #1a1e25; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.fh.ft-t { top: 0; border-radius: 3px 3px 0 0; transform-origin: 50% 100%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.fh.ft-b { bottom: 0; border-radius: 0 0 3px 3px; transform-origin: 50% 0; background: #161a20; }
+.fh > span { display: block; height: 200%; line-height: 1.2em; text-align: center; color: var(--fg); }
+.fh.ft-b > span { transform: translateY(-50%); }
+.fh.flap { z-index: 2; will-change: transform; }
+.ft::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: #0b0d10; z-index: 3; pointer-events: none; }
+.ft.blank .fh { background: #13161b; }
+.ft.blank .fh.ft-b { background: #111418; }
+.xflip .fd { font-style: normal; }
+.xflip .fd.t { color: var(--teal); }
+.xflip .fd.o { color: var(--accent); }
+.xflip.paused .ft::after { background: #08090b; }
 .xp-lede { margin: 6px 0 4px; color: var(--fg-2); font-size: 15px; line-height: 1.5; }
 .xp-search { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px 16px; display: grid; gap: 12px; }
 .xp-search .row2 { display: flex; gap: 10px; align-items: flex-end; }
@@ -2866,7 +2883,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   // and that's it. This device remembers recent lookups, favourites and a small snapshot per player, so a return
   // visit can say what changed ("since you last looked").
   // Routes live in the address: #explore, #explore/p/TAG, #explore/vs/TAG/TAG, #explore/club/TAG.
-  const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {}, visits: {} };
+  const X = { open: false, route: { v: "home" }, cache: new Map(), state: {}, since: {}, filt: "all", cat: "overview", sort: "trophies", more: {}, kind: "p", pushed: 0, scroll: {}, msg: {}, busy: {}, visits: {}, flipI: 0, flipPaused: false };
   const XI = {
     vs: '<path d="M2.5 2.5l8 8M13.5 2.5l-8 8M3.5 9.5l3 3M12.5 9.5l-3 3M2 14l2.6-2.6M14 14l-2.6-2.6"/>',
     club: '<path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.2-5.2 6.3-3-1.1-5.2-3.3-5.2-6.3V3.8L8 1.8Z"/><path d="M5.6 8.2l1.7 1.7 3.2-3.4"/>',
@@ -3072,7 +3089,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     const tile = (go, icon, t, sub, teal) => '<button class="xtile' + (teal ? " t" : "") + '" data-xgo="' + go + '"><span class="fi">' + xsvg(icon) + "</span><b>" + t + "</b><small>" + sub + "</small></button>";
     const kindSeg = '<div class="seg" role="group" aria-label="Look up">' + [["p", "Player"], ["c", "Club"]].map(([v, l]) => '<button type="button" data-xkind="' + v + '" aria-pressed="' + (X.kind === v) + '">' + l + "</button>").join("") + "</div>";
     const left = '<div>' +
-      '<h1 class="xp-h" tabindex="-1" data-xh>Explore<span>.</span></h1>' +
+      '<h1 class="xp-h" tabindex="-1" data-xh><span class="xsr">Explore.</span>' + flipBoard() + "</h1>" +
       '<p class="xp-lede">' + (mine.length ? "Look up any player or club, compare two players, and see their recent battles. Nothing is tracked, and it doesn\'t use a tracking spot."
         : "Look up any player or club, compare two players, and see their recent battles. No sign-up, and nothing is saved about them.") + "</p>" +
       '<form class="xp-search" id="xSearch" novalidate>' +
@@ -3097,6 +3114,71 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       "</div>";
     return '<div class="xhome">' + left + right + "</div>";
   }
+
+  // ----- the Explore heading: a split-flap board that turns Explore. -> Discover. -> Track. -----
+  // Each letter is a tile with a top and bottom half. A change flips the old top half down and the new bottom half
+  // into place, tile by tile from the left (45 ms apart), like a departure board. Only tiles whose letter changes
+  // flip. It waits 2.5 s on each word, and stops while the page is hidden, while you type in the search box, when
+  // you tap the board (tap again to restart), and for anyone who asked for reduced motion. Screen readers get the
+  // plain word "Explore." instead.
+  const FLIP_WORDS = [["Explore.", "t"], ["Discover.", "t"], ["Track.", "o"]];
+  const FLIP_N = 9, FLIP_WAIT = 2500, FLIP_STAGGER = 45;
+  const flipChars = (i) => FLIP_WORDS[i][0].padEnd(FLIP_N, " ").split("");
+  const flipCell = (ch, dot) => (ch === "." ? '<i class="fd ' + dot + '">.</i>' : ch === " " ? "" : esc(ch));
+  function flipBoard() {
+    const i = REDUCED() ? 0 : X.flipI, dot = FLIP_WORDS[i][1];
+    return '<span class="xflip' + (X.flipPaused ? " paused" : "") + '" aria-hidden="true" title="Tap to pause or play">' + flipChars(i).map((c) => {
+      const h = flipCell(c, dot);
+      return '<span class="ft' + (c === " " ? " blank" : "") + '"><span class="fh ft-t"><span>' + h + '</span></span><span class="fh ft-b"><span>' + h + "</span></span></span>";
+    }).join("") + "</span>";
+  }
+  function flipTile(t, a, b, blank, delay) {
+    return new Promise((done) => setTimeout(() => {
+      const top = t.querySelector(".fh.ft-t > span"), bot = t.querySelector(".fh.ft-b > span");
+      if (!t.isConnected || !top || !bot || !t.animate) { done(); return; }
+      const f1 = document.createElement("span"), f2 = document.createElement("span");
+      f1.className = "fh ft-t flap"; f1.innerHTML = "<span>" + a + "</span>";
+      f2.className = "fh ft-b flap"; f2.innerHTML = "<span>" + b + "</span>";
+      top.innerHTML = b; // the new letter's top half waits under the falling flap
+      t.appendChild(f1); t.appendChild(f2);
+      f1.animate([{ transform: "perspective(260px) rotateX(0deg)", filter: "brightness(1)" }, { transform: "perspective(260px) rotateX(-90deg)", filter: "brightness(0.55)" }],
+        { duration: 150, easing: "cubic-bezier(0.55, 0, 1, 0.45)", fill: "forwards" });
+      const a2 = f2.animate([{ transform: "perspective(260px) rotateX(90deg)", filter: "brightness(1.4)" }, { transform: "perspective(260px) rotateX(0deg)", filter: "brightness(1)" }],
+        { duration: 180, delay: 150, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.3)", fill: "backwards" });
+      a2.finished.catch(() => {}).then(() => { bot.innerHTML = b; f1.remove(); f2.remove(); t.classList.toggle("blank", blank); done(); });
+    }, delay));
+  }
+  function flipTo(next) {
+    const board = document.querySelector("#explore .xflip");
+    const from = flipChars(X.flipI), to = flipChars(next), oldDot = FLIP_WORDS[X.flipI][1], dot = FLIP_WORDS[next][1];
+    X.flipI = next;
+    if (!board) return Promise.resolve();
+    const jobs = [];
+    let k = 0;
+    for (let i = 0; i < FLIP_N; i++) {
+      const a = flipCell(from[i], oldDot), b = flipCell(to[i], dot);
+      if (a !== b) jobs.push(flipTile(board.children[i], a, b, to[i] === " ", k++ * FLIP_STAGGER));
+    }
+    return Promise.all(jobs);
+  }
+  let flipTimer = 0;
+  function flipLoop() {
+    clearTimeout(flipTimer);
+    flipTimer = setTimeout(async () => {
+      const board = X.open ? document.querySelector("#explore .xflip") : null, q = document.getElementById("xQ");
+      if (board && !document.hidden && !REDUCED() && !X.flipPaused && !(q && document.activeElement === q)) {
+        try { await flipTo((X.flipI + 1) % FLIP_WORDS.length); } catch (e) {}
+      }
+      flipLoop();
+    }, FLIP_WAIT);
+  }
+  flipLoop();
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest && ev.target.closest(".xflip");
+    if (!b) return;
+    X.flipPaused = !X.flipPaused;
+    b.classList.toggle("paused", X.flipPaused);
+  });
 
   function xPlayer(tag) {
     const st = xNeed("p", tag);

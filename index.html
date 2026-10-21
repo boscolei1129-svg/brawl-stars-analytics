@@ -1099,6 +1099,8 @@ html.xpopen, html.xpopen body { overflow: hidden; }
     }
     return j;
   }
+  const isNetErr = (e) => navigator.onLine === false || (!!e && (e.name === "TypeError" || /load failed|failed to fetch|networkerror|network connection/i.test(String(e.message || e))));
+  const OFFLINE_MSG = "<b>You're offline.</b> Showing your last saved stats.";
   // Goals are private to this device, so they come from the server function, not the public tables. If that fails,
   // the goals already on screen stay.
   const myGoals = () => callFn({ action: "goals_list" }).then((r) => r.goals || [])
@@ -2275,8 +2277,8 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       showBanner(res.player_error ? "<b>Your player stats didn't update this time.</b> " + esc(String(res.player_error).slice(0, 140)) : "", res.player_error ? { act: "retry", label: "Retry" } : null);
     } catch (e) {
       try { await loadData(!S.readings.length); } catch (e2) {}
-      showBanner(navigator.onLine === false
-        ? "<b>You're offline.</b> Showing your last saved stats."
+      showBanner(isNetErr(e)
+        ? OFFLINE_MSG
         : "<b>Couldn't refresh just now.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" });
     } finally {
       S.live.busy = false; S.live.at = Date.now(); render();
@@ -2536,7 +2538,7 @@ html.xpopen, html.xpopen body { overflow: hidden; }
       (saved
         ? '<div class="pc-note">' + esc(pl.name) + ' is already saved on this device.</div><button class="btn wide" data-home="open-look">Open ' + esc(pl.name) + "</button>"
         : L.tracked
-          ? '<div class="pc-note">Already tracked, so you\'ll see the same stats as everyone else following ' + esc(pl.name) + ". Goals and alerts you set stay private to this device.</div>" +
+          ? '<div class="pc-note">Already tracked, so adding ' + esc(pl.name) + " is free: it doesn\'t use one of your 2 spots, and you\'ll see the same stats as everyone else following them. Goals and alerts you set stay private to this device.</div>" +
             '<div id="pvAction"></div>'
           : '<div class="pc-sec"><span class="pc-lbl" id="clubLbl">Club to follow</span><div id="pvClub"></div></div>' +
             '<div id="pvAction"></div>') +
@@ -2959,7 +2961,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     if (code === "club_not_found") return { t: "No club with the tag #" + tag, d: "Check the club's tag in Brawl Stars (on the club's page, under its name)." };
     if (code === "slow_down") return { t: "Too many lookups from this network", d: "To keep the app free, each network can do about 60 lookups every 10 minutes. Wait a few minutes and try again." };
     if (code === "upstream_unavailable") return { t: "Brawl Stars data isn't reachable right now", d: "The game's data service didn't answer, and there's no recent copy of this " + (kind === "c" ? "club" : "player") + ". Try again in a minute." };
-    if (!navigator.onLine) return { t: "You're offline", d: "Explore needs a connection. Your saved players still open in My stats." };
+    if (isNetErr(e)) return { t: "You're offline", d: "Explore needs a connection. Your saved players still open in My stats." };
     return { t: "Couldn't load that", d: String((e && e.message) || e).slice(0, 140) };
   }
   // Loads what the current route needs (once), then repaints.
@@ -3398,6 +3400,12 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     if (X.route.v === "home") xClose(); else xBack();
   });
   window.addEventListener("online", () => { if (X.open) paintX(); });
+  // Going offline is shown straight away, also when the app comes back to the screen offline; coming back online
+  // clears the note and syncs.
+  function offlineCheck() { if (navigator.onLine === false && ME) showBanner(OFFLINE_MSG, { act: "retry", label: "Retry" }); }
+  window.addEventListener("offline", () => { offlineCheck(); if (X.open) paintX(); });
+  window.addEventListener("online", () => { const b = $("#banner"); if (ME && b && /offline/i.test(b.textContent)) { showBanner(""); refreshLive(); } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") offlineCheck(); });
 
   async function boot() {
     // Keeps the page, fonts and icons on this device so the app opens instantly (see sw.js).
@@ -3431,11 +3439,12 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
         return;
       }
       showBanner(S.readings.length
-        ? "<b>Couldn't reach the server.</b> Showing the stats saved on this device."
+        ? (isNetErr(e) ? OFFLINE_MSG : "<b>Couldn't reach the server.</b> Showing the stats saved on this device.")
         : "<b>Couldn't load your stats.</b> " + esc(String((e && e.message) || e).slice(0, 140)), { act: "retry", label: "Retry" });
     }
     S.loaded = true;
     render();
+    offlineCheck();
     const due = () => document.visibilityState === "visible" && !S.live.busy && Date.now() - Math.max(S.live.at, D ? D.lastTs : 0) > 3 * 60e3; // while the app is open, check every few minutes
     if (due()) refreshLive();
     setInterval(() => { if (due()) refreshLive(); }, 60e3);

@@ -79,6 +79,39 @@ function makeDb() {
   const fail = { rate_hit: false };
   const rpc = async (name, a) => {
     if (fail[name]) return { data: null, error: { message: "boom" } };
+    if (name === "create_device_link") {
+      // Contract stub only; db_link.js exercises the real lock and transaction.
+      const key = T.device_keys.find(x => x.key_hash === a.p_key_hash);
+      if (!key) return { data: { status: "no_device" }, error: null };
+      if (T.device_links.some(x => x.code_hash === a.p_code_hash && x.owner !== key.owner)) {
+        return { data: null, error: { code: "23505", message: "duplicate key" } };
+      }
+      T.device_links = T.device_links.filter(x => x.owner !== key.owner);
+      T.device_links.push({ code_hash: a.p_code_hash, owner: key.owner, expires_at: a.p_expires_at });
+      return { data: { status: "ok" }, error: null };
+    }
+    if (name === "redeem_device_link") {
+      // Contract stub for handler tests. The actual SQL is exercised separately.
+      const link = T.device_links.find(x => x.code_hash === a.p_code_hash && Date.parse(x.expires_at) > clock.now());
+      if (!link) return { data: { status: "bad_link" }, error: null };
+      const key = T.device_keys.find(x => x.key_hash === a.p_key_hash);
+      if (key?.owner === link.owner) return { data: { status: "same_device" }, error: null };
+      let moved = 0;
+      if (!key) T.device_keys.push({ key_hash: a.p_key_hash, owner: link.owner });
+      else {
+        const source = key.owner;
+        for (const g of T.goals.filter(x => x.owner === source)) { g.owner = link.owner; moved++; }
+        for (const p of T.push_subs.filter(x => x.owner === source)) p.owner = link.owner;
+        for (const p of T.profile_adders.filter(x => x.owner === source)) {
+          if (!T.profile_adders.some(x => x.owner === link.owner && x.tag === p.tag)) T.profile_adders.push({ ...p, owner: link.owner });
+        }
+        T.profile_adders = T.profile_adders.filter(x => x.owner !== source);
+        for (const k of T.device_keys.filter(x => x.owner === source)) k.owner = link.owner;
+        T.device_links = T.device_links.filter(x => x.owner !== source);
+      }
+      T.device_links = T.device_links.filter(x => x.code_hash !== a.p_code_hash);
+      return { data: { status: "ok", moved }, error: null };
+    }
     if (name === "count_usage") {
       const hour = new Date(Math.floor(clock.now() / 3600e3) * 3600e3).toISOString();
       for (const k of a.p_keys) { let r = T.usage_counters.find((x) => x.key === k && x.hour === hour); if (!r) T.usage_counters.push((r = { key: k, hour, n: 0 })); r.n++; }
@@ -108,7 +141,7 @@ function makeDb() {
   return { T, clock, fail, client: { from: (t) => new Q(t), rpc } };
 }
 
-function load(file, { player, fetch: customFetch } = {}) {
+function load(file, { player, fetch: customFetch, edgeRuntime } = {}) {
   const db = makeDb();
   const sent = [];
   let src = fs.readFileSync(file, "utf8")
@@ -133,12 +166,17 @@ function load(file, { player, fetch: customFetch } = {}) {
     return new Response("{}", { status: 404 });
   };
   const fastTimeout = (fn) => setImmediate(fn); // the server's deliberate delays would only slow the tests
-  new Function("__mock", "__webpush", "Deno", "fetch", "require", "module", "exports", "setTimeout", js)({ createClient: () => db.client }, webpush, Deno, customFetch || fakeFetch, require, { exports: {} }, {}, fastTimeout);
+  const scope = { EdgeRuntime: edgeRuntime };
+  new Function("globalThis", "__mock", "__webpush", "Deno", "fetch", "require", "module", "exports", "setTimeout", js)(scope, { createClient: () => db.client }, webpush, Deno, customFetch || fakeFetch, require, { exports: {} }, {}, fastTimeout);
   const call = async (body, ip = "203.0.113.1", headers = {}) => {
     const req = new Request("https://x.test/functions/v1/brawl", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip, "x-forwarded-for": ip, ...headers }, body: JSON.stringify(body) });
     const res = await handler(req);
     return { status: res.status, ...(await res.json()) };
   };
-  return { db, call, sent, internals: globalThis.__internals };
+  return { db, call, sent, handler, internals: scope.__internals };
 }
-module.exports = { load };
+const pushKeys = () => {
+  const ecdh = crypto.createECDH("prime256v1");
+  return { p256dh: ecdh.generateKeys().toString("base64url"), auth: crypto.randomBytes(16).toString("base64url") };
+};
+module.exports = { load, pushKeys };

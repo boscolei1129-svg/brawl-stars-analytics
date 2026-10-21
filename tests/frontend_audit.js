@@ -1,0 +1,45 @@
+// DOM contract tests in Node (no browser layout/accessibility engine).
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const src = fs.readFileSync(require('node:path').join(__dirname, '../app.js'), 'utf8');
+let n = 0;
+const check = (name, truth) => { assert.ok(truth, name); n++; console.log('ok  ', name); };
+function app(hash = '#club', saved = {}, framed = false) {
+  const docEvents = {}, winEvents = {}, elements = new Map();
+  const make = () => ({ inert: false, hidden: false, isConnected: true, innerHTML: '', textContent: '', classList: { add(){}, remove(){}, contains(){return false} }, focus(){ document.activeElement = this; }, setAttribute(){}, getAttribute(){return null}, closest(){return null}, remove(){}, appendChild(){}, replaceChildren(){this.innerHTML=''} });
+  for (const selector of ['#home', 'body > .wrap', 'body > .tabbar', '#explore', '#xpBody', '#xpBar', '#whoBtn', '#xpBody [data-xh]']) elements.set(selector, make());
+  const document = { querySelector: s => elements.get(s) || null, querySelectorAll: s => s.split(',').map(x=>elements.get(x.trim())).filter(Boolean), body: make(), documentElement: make(), activeElement: null, addEventListener: (name, fn) => (docEvents[name] ||= []).push(fn), createElement: make };
+  const storage = { ...saved }, location = new URL('https://app.test/?p=8YRJ090Q2' + hash);
+  const history = { pushState: (_, __, url) => { location.href = new URL(url, location).href; }, replaceState: (_, __, url) => { location.href = new URL(url, location).href; } };
+  const window = { addEventListener: (name, fn) => (winEvents[name] ||= []).push(fn), scrollTo(){}, matchMedia: ()=>({matches:true}) };
+  window.self = window; window.top = framed ? {} : window;
+  const context = { document, window, history, location, navigator: {onLine:true}, localStorage: { getItem:k=>storage[k]??null, setItem:(k,v)=>storage[k]=v, removeItem:k=>delete storage[k] }, console, URL, URLSearchParams, Intl, setTimeout:()=>0, clearTimeout(){}, setInterval:()=>0, performance, HTMLImageElement:class{}, fetch:()=>{throw Error('Unexpected network request')} };
+  const instrumented = src.replace('  boot();', '  globalThis.audit = { S, H, X, xShow, xHide, xClose, xPlayer, coverLayer, uncoverLayer, setPlayer: tag => { ME = tag; } };');
+  vm.runInNewContext(instrumented, context);
+  return { ...context, elements, storage, docEvents, winEvents };
+}
+const a=app(); const {audit}=a; audit.setPlayer('8YRJ090Q2');
+check('deep link initially opens Club',audit.S.tab==='club');
+const button={dataset:{go:'me'},closest:selector=>selector==='button'?button:null};
+for(const fn of a.docEvents.click) fn({target:button,preventDefault(){}});
+check('tab click updates screen, URL and saved tab',audit.S.tab==='me' && a.location.hash==='#me' && a.storage.tab==='me');
+check('reload keeps the selected Me section',app(a.location.hash,a.storage).audit.S.tab==='me');
+a.location.hash='#club';for(const fn of a.winEvents.hashchange)fn();
+check('browser history restores the matching section',audit.S.tab==='club' && a.storage.tab==='club');
+audit.xShow({v:'home'});
+check('Explore makes all three covered roots inert',['#home','body > .wrap','body > .tabbar'].every(s=>a.elements.get(s).inert));
+audit.coverLayer('about',[...a.elements.values()]);
+audit.xHide();
+check('closing Explore under About keeps covered content inert',a.elements.get('body > .wrap').inert);
+audit.uncoverLayer('about');
+check('closing last layer restores prior focusability',!a.elements.get('body > .wrap').inert);
+const prior={inert:true};audit.coverLayer('test',[prior]);audit.uncoverLayer('test');
+check('preexisting inert state is preserved',prior.inert);
+audit.xShow({v:'home'});a.location.hash='#explore';audit.xClose();
+check('closing Explore restores the current stats route',a.location.hash==='#club' && !audit.X.open);
+const tag='8YRJ090Q2', data={player:{tag,name:'Test',trophies:1000,highest:1200,brawlers:[],battles:[]},source:'cache',fetched_at:new Date().toISOString(),tracked:true,active:true};
+audit.X.state['p:'+tag]={r:data,at:Date.now()};
+check('tracked lookup states that history is tracked',audit.xPlayer(tag).includes('Already tracked in the app.'));
+data.active=false;check('paused lookup discloses retained history',audit.xPlayer(tag).includes('Tracking is paused; saved history is retained.'));
+data.tracked=false;check('untracked lookup discloses local recents and server cache',audit.xPlayer(tag).includes('Recent lookups stay on this device; public data is cached on the server.'));
+check('framed app does not initialize application controls',app('',{},true).audit===undefined);
+console.log(`All ${n} frontend DOM contract checks passed; viewport and keyboard-engine testing still require a browser.`);

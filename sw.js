@@ -1,23 +1,25 @@
-// Opens the app instantly: the page, fonts and icons come from this device first and are refreshed
-// in the background, so a new version shows up on the next open. Game pictures (brawlers, profile icons,
+// Opens the app instantly from an installed release of its page, script, fonts and icons.
+// Bump CACHE whenever a shell file changes. The next release installs in full and activates
+// after the app's existing tabs close, so old HTML never receives a new app.js. Game pictures (brawlers, profile icons,
 // modes, maps) are kept on the device after their first download. Stats requests to Supabase are never
 // touched here; the page keeps its own saved copy of those.
-const CACHE = "brawl-stats-v1";
+const CACHE = "brawl-stats-v2";
 const ART_CACHE = "brawl-art-v1";
 const ART_HOSTS = ["cdn.brawlify.com", "media.brawltime.ninja"];
 const ART_MAX = 800;
-const SHELL = ["./", "manifest.webmanifest", "icon-192.png", "favicon-32.png",
+const SHELL = ["./", "app.js", "manifest.webmanifest", "icon-192.png", "favicon-32.png",
   "fonts/chakra-petch-latin-500-normal.woff2", "fonts/chakra-petch-latin-600-normal.woff2", "fonts/chakra-petch-latin-700-normal.woff2",
   "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2"];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
+  // A failed download must fail installation, leaving the working release active.
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((path) =>
+    new Request(new URL(path, self.registration.scope).href, { cache: "reload" })))));
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
-    for (const key of await caches.keys()) if (key !== CACHE && key !== ART_CACHE) await caches.delete(key);
+    for (const key of await caches.keys()) if (key.startsWith("brawl-stats-") && key !== CACHE) await caches.delete(key);
     await self.clients.claim();
   })());
 });
@@ -48,18 +50,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const saved = await cache.match(key);
-    // The page itself is always re-checked with the server (not the browser's 10-minute cache), so a new
-    // version is ready by the next open.
-    const isPage = key === new URL("./", self.registration.scope).href;
-    const fresh = fetch(isPage ? new Request(url.href, { cache: "no-cache", credentials: "same-origin" }) : req).then((res) => {
-      if (res.ok && res.type === "basic") cache.put(key, res.clone()).catch(() => {});
-      return res;
-    });
-    if (saved) {
-      event.waitUntil(fresh.catch(() => {}));
-      return saved;
-    }
-    return fresh;
+    // Shell files stay together for this worker's lifetime. Revalidating them
+    // separately can pair new markup with an older script (or the reverse).
+    if (saved) return saved;
+    return fetch(req);
   })());
 });
 

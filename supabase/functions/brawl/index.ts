@@ -456,8 +456,12 @@ async function pushTo(subs: any[], payload: unknown) {
   webpush.setVapidDetails(v.subject, v.publicKey, v.privateKey);
   let sent = 0;
   for (const s of subs) {
+    // Revalidate stored subscriptions too: older versions accepted arbitrary URLs.
+    const sub = cleanSub({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } });
+    if (!sub) continue;
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: "normal" });
+      // web-push uses a single HTTPS request and does not follow redirects.
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: "normal", timeout: 10000 });
       sent++;
       await sb.from("push_subs").update({ last_sent_at: new Date().toISOString() }).eq("endpoint", s.endpoint);
     } catch (e: any) {
@@ -667,8 +671,25 @@ const cleanPrefs = (p: any) => ({
 });
 function cleanSub(sub: any) {
   const endpoint = String(sub?.endpoint ?? ""), p256dh = String(sub?.keys?.p256dh ?? ""), auth = String(sub?.keys?.auth ?? "");
-  if (!/^https:\/\//.test(endpoint) || !p256dh || !auth || endpoint.length > 1000) return null;
-  return { endpoint, p256dh, auth };
+  if (endpoint.length > 1000 || p256dh.length > 88 || auth.length > 24) return null;
+  let url: URL;
+  try { url = new URL(endpoint); } catch { return null; }
+  // Only browser push services may receive server-signed requests. In particular,
+  // reject arbitrary domains, IP literals, credentials and nonstandard ports.
+  const host = url.hostname;
+  const provider = host === "fcm.googleapis.com" || host === "updates.push.services.mozilla.com"
+    || /^[a-z0-9-]+\.push\.apple\.com$/.test(host)
+    || /^[a-z0-9-]+\.notify\.windows\.com$/.test(host);
+  if (url.protocol !== "https:" || !provider || url.username || url.password || url.port || url.hash || url.pathname === "/") return null;
+  const bytes = (s: string) => {
+    if (!/^[A-Za-z0-9_-]+={0,2}$/.test(s)) return null;
+    try { return atob(s.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "")); } catch { return null; }
+  };
+  const publicKey = bytes(p256dh), authKey = bytes(auth);
+  if (!publicKey || publicKey.length !== 65 || publicKey.charCodeAt(0) !== 4 || !authKey || authKey.length !== 16) return null;
+  // Pass the parsed URL onwards so the request library cannot interpret the
+  // original string differently (for example, backslashes or whitespace).
+  return { endpoint: url.href, p256dh, auth };
 }
 
 async function sha256(text: string) {
@@ -1044,11 +1065,25 @@ const publicProfile = (p: any) => ({ tag: p.tag, club: p.club, name: p.name, ico
 const fail = (error: string, status = 400) => json({ ok: false, error }, status);
 
 Deno.serve(async (req) => {
-  const res = await handle(req);
-  await flushUsage();
+  const started = performance.now();
+  const stages: string[] = [];
+  const measure: StageTimer = async (name, work) => {
+    const start = performance.now();
+    try { return await work(); }
+    finally { stages.push(`${name};dur=${(performance.now() - start).toFixed(1)}`); }
+  };
+  const res = await handle(req, measure);
+  // Counters contain no user identifiers and must not delay a cached answer.
+  // waitUntil keeps the task alive on Supabase; other runtimes await it normally.
+  const pending = flushUsage().catch((e) => console.error("usage", String(e)));
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(pending); else await pending;
+  res.headers.set("Server-Timing", [...stages, `app;dur=${(performance.now() - started).toFixed(1)}`].join(", "));
+  res.headers.set("Access-Control-Expose-Headers", "Server-Timing");
   return res;
 });
-async function handle(req: Request): Promise<Response> {
+type StageTimer = <T>(name: string, work: () => PromiseLike<T>) => Promise<T>;
+async function handle(req: Request, measure: StageTimer): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
   let body: any = {};
@@ -1125,18 +1160,22 @@ async function handle(req: Request): Promise<Response> {
       }
       case "explore_player": {
         if (!body.tag || !TAG_RE.test(tag)) return fail("bad_tag");
-        await limit("ex:" + ip, 600, 60, true);
+        await measure("rate", () => limit("ex:" + ip, 600, 60, true));
         use("explore:player");
-        const r = await exCached("p:" + tag, EX_TTL.player, () => explorePlayerFetch(tag));
-        const prof = await getProfile(tag);
+        const [r, prof] = await Promise.all([
+          measure("lookup", () => exCached("p:" + tag, EX_TTL.player, () => explorePlayerFetch(tag))),
+          measure("profile", () => getProfile(tag)),
+        ]);
         return json({ ok: true, player: r.body, fetched_at: new Date(r.at).toISOString(), source: r.source, tracked: !!prof, active: prof?.active ?? null });
       }
       case "explore_club": {
         if (!body.tag || !TAG_RE.test(tag)) return fail("bad_tag");
-        await limit("ex:" + ip, 600, 60, true);
+        await measure("rate", () => limit("ex:" + ip, 600, 60, true));
         use("explore:club");
-        const r = await exCached("c:" + tag, EX_TTL.club, () => exploreClubFetch(tag));
-        const { data: fol } = await sb.from("profiles").select("tag").eq("club", tag).eq("active", true).limit(1);
+        const [r, { data: fol }] = await Promise.all([
+          measure("lookup", () => exCached("c:" + tag, EX_TTL.club, () => exploreClubFetch(tag))),
+          measure("profile", () => sb.from("profiles").select("tag").eq("club", tag).eq("active", true).limit(1)),
+        ]);
         return json({ ok: true, club: r.body, fetched_at: new Date(r.at).toISOString(), source: r.source, tracked_via: fol?.[0]?.tag ?? null });
       }
       case "refresh": {
@@ -1182,13 +1221,19 @@ async function handle(req: Request): Promise<Response> {
         const owner = await ownerOf(body.device, ip, true);
         if (!owner) return fail("no_device", 401);
         await limit("linkc:" + owner, 3600, 10);
-        await sb.from("device_links").delete().eq("owner", owner);
+        const key_hash = await deviceHash(body.device);
         const expires_at = new Date(Date.now() + LINK_MS).toISOString();
         for (let i = 0; i < 5; i++) {
           const code = sixDigits();
-          const { error } = await sb.from("device_links").insert({ code_hash: await sha256("link:" + code), owner, expires_at });
-          if (!error) return json({ ok: true, code, expires_at });
-          if (error.code !== "23505") throw error;
+          // Resolve ownership inside the transaction: it may change while this
+          // request is in flight if another linked device merges their owner.
+          const { data, error } = await sb.rpc("create_device_link", {
+            p_code_hash: await sha256("link:" + code), p_key_hash: key_hash, p_expires_at: expires_at,
+          });
+          if (error) { if (error.code === "23505") continue; throw error; }
+          if (data?.status === "no_device") return fail("no_device", 401);
+          if (data?.status !== "ok") throw new Error("link_unavailable");
+          return json({ ok: true, code, expires_at });
         }
         throw new Error("no_code");
       }
@@ -1200,28 +1245,13 @@ async function handle(req: Request): Promise<Response> {
         const code = String(body.code ?? "").replace(/\D/g, "");
         if (code.length !== 6) return fail("bad_link");
         const code_hash = await sha256("link:" + code);
-        const { data: link } = await sb.from("device_links").select("*").eq("code_hash", code_hash).gt("expires_at", new Date().toISOString()).maybeSingle();
-        if (!link) return fail("bad_link", 404);
         const key_hash = await deviceHash(body.device);
-        const { data: mine } = await sb.from("device_keys").select("owner").eq("key_hash", key_hash).maybeSingle();
-        if (mine?.owner === link.owner) return fail("same_device");
-        await sb.from("device_links").delete().eq("code_hash", code_hash); // single use
-        let moved = 0;
-        if (mine?.owner) {
-          // This device (and any linked to it) joins the other one, bringing its own goals and alerts along.
-          const g = await sb.from("goals").update({ owner: link.owner }, { count: "exact" }).eq("owner", mine.owner);
-          moved = g.count ?? 0;
-          await sb.from("push_subs").update({ owner: link.owner }).eq("owner", mine.owner);
-          // Players this device started move too (linked devices share one limit).
-          const { data: held } = await sb.from("profile_adders").select("tag").eq("owner", mine.owner);
-          for (const h of held ?? []) await hold(link.owner, h.tag);
-          await sb.from("profile_adders").delete().eq("owner", mine.owner);
-          await sb.from("device_keys").update({ owner: link.owner }).eq("owner", mine.owner);
-        } else {
-          const { error } = await sb.from("device_keys").insert({ key_hash, owner: link.owner });
-          if (error) throw error;
-        }
-        return json({ ok: true, moved });
+        const { data, error } = await sb.rpc("redeem_device_link", { p_code_hash: code_hash, p_key_hash: key_hash });
+        if (error) throw error; // fail closed; never fall back to a non-atomic merge
+        if (data?.status === "bad_link") return fail("bad_link", 404);
+        if (data?.status === "same_device") return fail("same_device");
+        if (data?.status !== "ok") throw new Error("link_unavailable");
+        return json({ ok: true, moved: data.moved ?? 0 });
       }
       case "claim_legacy": {
         // A phone that still remembers a player's old code takes over the goals made with it.

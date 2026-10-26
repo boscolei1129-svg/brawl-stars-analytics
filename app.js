@@ -2203,15 +2203,27 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
   }
 
   // ----- the Explore heading: a split-flap board that turns Explore. -> Discover. -> Track. -----
-  // Each letter is a tile with a top and bottom half. A change flips the old top half down and the new bottom half
-  // into place, tile by tile from the left (45 ms apart), like a departure board. Only tiles whose letter changes
-  // flip. It waits 2.5 s on each word, and stops while the page is hidden, while you type in the search box, when
-  // you tap the board (tap again to restart), and for anyone who asked for reduced motion. Screen readers get the
-  // plain word "Explore." instead.
+  // Each letter is a tile with a top and bottom half. A flip drops the old top half and brings the new bottom half
+  // into place. Like a departure board, a changing tile spins through the 3 to 6 letters before its new one on the
+  // drum (70 ms each), then lands on it with a slower flip, tile by tile from the left (45 ms apart). The whole board
+  // settles in about a second. Only tiles whose letter changes spin. The flaps move by transform, with shading
+  // faded by opacity, so phones don't repaint each frame. It waits 2.5 s on each word, and stops while the page is
+  // hidden, while you type in the search box, when you tap the board (tap again to restart), and for anyone who asked
+  // for reduced motion. Screen readers get the plain word "Explore." instead.
   const FLIP_WORDS = [["Explore.", "t"], ["Discover.", "t"], ["Track.", "o"]];
-  const FLIP_N = 9, FLIP_WAIT = 2500, FLIP_STAGGER = 45;
+  const FLIP_N = 9, FLIP_WAIT = 2500, FLIP_STAGGER = 45, FLIP_STEP = 70;
+  const FLIP_DRUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.0123456789 ";
   const flipChars = (i) => FLIP_WORDS[i][0].padEnd(FLIP_N, " ").split("");
   const flipCell = (ch, dot) => (ch === "." ? '<i class="fd ' + dot + '">.</i>' : ch === " " ? "" : esc(ch));
+  // The letters a tile passes on the drum just before landing on ch, in ch's case.
+  function flipRun(ch, dot) {
+    const up = ch.toUpperCase(), k = Math.max(0, FLIP_DRUM.indexOf(up)), L = FLIP_DRUM.length, run = [];
+    for (let j = 3 + Math.floor(Math.random() * 4); j >= 1; j--) {
+      const c = FLIP_DRUM[(k - j + L) % L];
+      run.push(flipCell(ch === up ? c : c.toLowerCase(), dot));
+    }
+    return run;
+  }
   function flipBoard() {
     const i = REDUCED() ? 0 : X.flipI, dot = FLIP_WORDS[i][1];
     return '<span class="xflip' + (X.flipPaused ? " paused" : "") + '" aria-hidden="true" title="Tap to pause or play">' + flipChars(i).map((c) => {
@@ -2219,24 +2231,40 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       return '<span class="ft' + (c === " " ? " blank" : "") + '"><span class="fh ft-t"><span>' + h + '</span></span><span class="fh ft-b"><span>' + h + "</span></span></span>";
     }).join("") + "</span>";
   }
-  function flipTile(t, a, b, blank, delay) {
+  function flipTile(t, a, b, blank, delay, run) {
     return new Promise((done) => setTimeout(() => {
       const top = t.querySelector(".fh.ft-t > span"), bot = t.querySelector(".fh.ft-b > span");
       if (!t.isConnected || !top || !bot || !t.animate) { done(); return; }
-      const f1 = document.createElement("span"), f2 = document.createElement("span");
-      f1.className = "fh ft-t flap"; f1.innerHTML = "<span>" + a + "</span>";
-      f2.className = "fh ft-b flap"; f2.innerHTML = "<span>" + b + "</span>";
-      top.innerHTML = b; // the new letter's top half waits under the falling flap
+      // One pair of flaps per spin, refilled for each letter.
+      const flap = (cls, shade) => { const f = document.createElement("span"); f.className = cls; f.innerHTML = '<span></span><i class="fs' + shade + '"></i>'; return f; };
+      const f1 = flap("fh ft-t flap", ""), f2 = flap("fh ft-b flap", " l");
       t.appendChild(f1); t.appendChild(f2);
-      f1.animate([{ transform: "perspective(260px) rotateX(0deg)", filter: "brightness(1)" }, { transform: "perspective(260px) rotateX(-90deg)", filter: "brightness(0.55)" }],
-        { duration: 150, easing: "cubic-bezier(0.55, 0, 1, 0.45)", fill: "forwards" });
-      const a2 = f2.animate([{ transform: "perspective(260px) rotateX(90deg)", filter: "brightness(1.4)" }, { transform: "perspective(260px) rotateX(0deg)", filter: "brightness(1)" }],
-        { duration: 180, delay: 150, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.3)", fill: "backwards" });
-      // Finishes on the animation's end, or after 700 ms if the page isn't being drawn (animations then never end).
-      let over = false;
-      const fin = () => { if (over) return; over = true; bot.innerHTML = b; f1.remove(); f2.remove(); t.classList.toggle("blank", blank); done(); };
-      a2.finished.catch(() => {}).then(fin);
-      setTimeout(fin, 700);
+      const seq = run.concat([b]), live = [];
+      let from = a, i = 0, over = false;
+      const fin = () => { if (over) return; over = true; live.forEach((x) => x.cancel()); top.innerHTML = b; bot.innerHTML = b; f1.remove(); f2.remove(); t.classList.toggle("blank", blank); done(); };
+      const step = () => {
+        if (over) return;
+        if (!t.isConnected) { fin(); return; }
+        const to = seq[i], last = i === seq.length - 1, fall = last ? 150 : FLIP_STEP / 2, rise = last ? 180 : FLIP_STEP / 2;
+        live.splice(0).forEach((x) => x.cancel());
+        f1.firstChild.innerHTML = from; f2.firstChild.innerHTML = to;
+        top.innerHTML = to; // the next letter's top half waits under the falling flap
+        live.push(
+          f1.animate([{ transform: "perspective(260px) rotateX(0deg)" }, { transform: "perspective(260px) rotateX(-90deg)" }],
+            { duration: fall, easing: last ? "cubic-bezier(0.55, 0, 1, 0.45)" : "ease-in", fill: "forwards" }),
+          f1.lastChild.animate([{ opacity: 0 }, { opacity: 0.45 }], { duration: fall, fill: "forwards" }),
+          f2.animate([{ transform: "perspective(260px) rotateX(90deg)" }, { transform: "perspective(260px) rotateX(0deg)" }],
+            { duration: rise, delay: fall, easing: last ? "cubic-bezier(0.2, 0.9, 0.3, 1.3)" : "ease-out", fill: "backwards" }),
+          f2.lastChild.animate([{ opacity: 0.12 }, { opacity: 0 }], { duration: rise, delay: fall, fill: "backwards" }));
+        if (last) {
+          // Finishes on the landing flip's end, or after 700 ms if the page isn't being drawn (animations then never end).
+          live[2].finished.catch(() => {}).then(fin);
+          setTimeout(fin, 700);
+          return;
+        }
+        setTimeout(() => { bot.innerHTML = to; from = to; i++; step(); }, fall + rise);
+      };
+      step();
     }, delay));
   }
   function flipTo(next) {
@@ -2248,7 +2276,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     let k = 0;
     for (let i = 0; i < FLIP_N; i++) {
       const a = flipCell(from[i], oldDot), b = flipCell(to[i], dot);
-      if (a !== b) jobs.push(flipTile(board.children[i], a, b, to[i] === " ", k++ * FLIP_STAGGER));
+      if (a !== b) jobs.push(flipTile(board.children[i], a, b, to[i] === " ", k++ * FLIP_STAGGER, flipRun(to[i], dot)));
     }
     return Promise.all(jobs);
   }

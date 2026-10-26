@@ -738,6 +738,8 @@ html.xpopen, html.xpopen body { overflow: hidden; }
 .fh > span { display: block; height: 200%; line-height: 1.2em; text-align: center; color: var(--fg); }
 .fh.ft-b > span { transform: translateY(-50%); }
 .fh.flap { z-index: 2; will-change: transform; }
+.fh > .fs { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+.fh > .fs.l { background: #fff; }
 .ft::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: #0b0d10; z-index: 3; pointer-events: none; }
 .ft.blank .fh { background: #13161b; }
 .ft.blank .fh.ft-b { background: #111418; }

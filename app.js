@@ -21,7 +21,7 @@
   const FN_URL = SB_URL + "/functions/v1/brawl";
   const HOUR = 3600e3, DAY = 864e5;
   const RANGES = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY, all: Infinity };
-  const RANGE_LABEL = { "24h": "24H", "7d": "7D", "30d": "30D", all: "All" };
+  const RANGE_LABEL = { "24h": "24h", "7d": "7d", "30d": "30d", all: "All" };
 
   const S = {
     readings: [], battleRows: [], goals: [], sessions: [], link: {}, sessClub: null, profile: null, actDay: 0, actOpen: null, ver: 0, loaded: false, ownerCode: null, goalBusy: false,
@@ -382,7 +382,7 @@
   }
   function drawChart(host, pts, o) {
     host.innerHTML = "";
-    if (!pts.length) { host.innerHTML = '<div class="chart-empty">' + esc(o.empty || "No readings yet.") + "</div>"; return; }
+    if (!pts.length) { host.innerHTML = '<div class="chart-empty">' + ghost() + "<span>" + esc(o.empty || "No readings yet.") + "</span></div>"; return; }
     const W = Math.max(260, host.clientWidth || 320), H = Math.round((o.h || 170) * (WIDE() ? 1.3 : 1)), L = 2, R = 60, T = 12, B = 24;
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     let x0 = Math.min(...xs), x1 = Math.max(...xs);
@@ -400,22 +400,28 @@
       const y = sy(0).toFixed(1);
       g += '<line x1="' + L + '" x2="' + (W - R + 4) + '" y1="' + y + '" y2="' + y + '" style="stroke:var(--muted);stroke-width:1;opacity:.7"/>';
     }
-    const xl = o.xLabels || [o.index ? "OLDER" : (x1 - x0 < 2 * DAY ? tShort(x0) : dShort(x0)), o.index ? "LATEST" : (x1 - x0 < 2 * DAY ? tShort(x1) : dShort(x1))];
+    const xl = o.xLabels || [o.index ? "Older" : (x1 - x0 < 2 * DAY ? tShort(x0) : dShort(x0)), o.index ? "Latest" : (x1 - x0 < 2 * DAY ? tShort(x1) : dShort(x1))];
     g += '<text class="ax" x="' + L + '" y="' + (H - 5) + '">' + esc(xl[0]) + "</text>";
     g += '<text class="ax" x="' + (W - R) + '" y="' + (H - 5) + '" text-anchor="end">' + esc(xl[1]) + "</text>";
-    const color = o.color || "var(--accent)";
+    const color = o.color || "var(--accent)", gid = "fill-" + (host.id || "c");
+    g += '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:' + color + ';stop-opacity:.3"/><stop offset="1" style="stop-color:' + color + ';stop-opacity:0"/></linearGradient></defs>';
     if (pts.length > 1) {
       const line = pts.map((p, i) => (i ? "L" : "M") + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join(" ");
       const base = sy(o.zero ? Math.max(sc.min, Math.min(0, sc.max)) : sc.min).toFixed(1);
       const area = line + " L" + sx(pts[pts.length - 1][0]).toFixed(1) + " " + base + " L" + sx(pts[0][0]).toFixed(1) + " " + base + " Z";
       const dc = S.drawAnim ? " draw" : "";
-      g += '<path class="area' + dc + '" d="' + area + '" style="fill:' + color + ';opacity:.08;stroke:none"/>';
-      g += '<path class="line' + dc + '" d="' + line + '" style="fill:none;stroke:' + color + ';stroke-width:2;stroke-linejoin:miter"/>';
+      g += '<path class="area' + dc + '" d="' + area + '" style="fill:url(#' + gid + ');stroke:none"/>';
+      g += '<path class="line' + dc + '" d="' + line + '" style="fill:none;stroke:' + color + ';stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/>';
     }
-    const lp = pts[pts.length - 1];
-    g += '<rect class="ring' + (S.drawAnim && pts.length > 1 ? " draw" : "") + '" x="' + (sx(lp[0]) - 4).toFixed(1) + '" y="' + (sy(lp[1]) - 4).toFixed(1) + '" width="8" height="8" style="fill:' + color + '"/>';
+    // The latest reading: a glowing dot with its value beside it, above or below the line so the two don't cross.
+    const lp = pts[pts.length - 1], lx = sx(lp[0]), ly = sy(lp[1]), dr = S.drawAnim && pts.length > 1 ? " draw" : "";
+    const fromAbove = pts.length > 1 && sy(pts[pts.length - 2][1]) < ly - 0.5;
+    const ty = Math.min(H - B - 4, Math.max(T + 8, fromAbove ? ly + 18 : ly - 10));
+    g += '<circle class="ring halo' + dr + '" cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="9" style="fill:' + color + ';stroke:none"/>';
+    g += '<circle class="ring' + dr + '" cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="4.5" style="fill:' + color + '"/>';
+    if (pts.length > 1) g += '<text class="last ring' + dr + '" x="' + (lx - 9).toFixed(1) + '" y="' + ty.toFixed(1) + '" text-anchor="end">' + esc(o.fmtY ? o.fmtY(lp[1]) : fmt(lp[1])) + "</text>";
     g += '<line class="xh" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" visibility="hidden"/>';
-    g += '<rect class="ring hd" width="8" height="8" style="fill:' + color + '" visibility="hidden"/>';
+    g += '<circle class="ring hd" r="4.5" style="fill:' + color + '" visibility="hidden"/>';
     g += '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:transparent"/>';
     host.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(o.label || "Chart") + '">' + g + '</svg><div class="tip" hidden></div>';
     const svg = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = svg.querySelector(".xh"), hd = svg.querySelector(".hd");
@@ -428,7 +434,7 @@
       pts.forEach((p, i) => { const d = Math.abs(sx(p[0]) - px); if (d < bd) { bd = d; best = i; } });
       const p = pts[best], cx = sx(p[0]), cy = sy(p[1]);
       xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
-      hd.setAttribute("x", cx - 4); hd.setAttribute("y", cy - 4); hd.setAttribute("visibility", "visible");
+      hd.setAttribute("cx", cx); hd.setAttribute("cy", cy); hd.setAttribute("visibility", "visible");
       tip.innerHTML = o.tip ? o.tip(p, best) : "<b>" + fmt(p[1]) + "</b><br>" + esc(dtShort(p[0]));
       tip.hidden = false;
       const left = (cx / W) * r.width, tw = tip.offsetWidth || 120;
@@ -449,14 +455,29 @@
   const seg = (group, key, opts) => '<div class="seg" role="group">' + opts.map(([v, l]) => '<button data-seg="' + group + '" data-v="' + v + '" aria-pressed="' + (key === v) + '">' + l + "</button>").join("") + "</div>";
   const rangeSeg = (group, keys = ["24h", "7d", "30d", "all"]) => seg(group, S.r[group], keys.map((k) => [k, RANGE_LABEL[k]]));
   const chip = (n, suffix = "", kind) => '<span class="chip ' + (kind || cls(n)) + '">' + sgn(n) + suffix + "</span>";
+  // A change as a pill: arrow, size, and when ("▲ 517 in 7 days").
+  const dChip = (d, when) => '<span class="chip ' + (d > 0 ? "up" : d < 0 ? "down" : "") + '">' + (d > 0 ? "▲ " : d < 0 ? "▼ " : "") + '<span class="num">' + fmt(Math.abs(d)) + "</span> " + when + "</span>";
+  // A dotted placeholder line for charts that have nothing to draw yet.
+  const ghost = () => '<svg class="ghostline" viewBox="0 0 300 54" preserveAspectRatio="none" aria-hidden="true"><path d="M0 44 C40 36 62 46 100 33 S168 22 200 26 S262 9 300 7"/></svg>';
+  // Progress toward the nearest goal of this kind on this device, or else the next round milestone. Taps through to Goals.
+  function heroGoal(kind, cur, step) {
+    if (cur == null) return "";
+    const g = S.goals.filter((x) => x.kind === kind && x.target > cur).sort((a, b) => a.target - b.target)[0];
+    let target, from, label;
+    if (g) { target = g.target; from = g.start != null && g.start < target ? g.start : 0; label = "Next goal"; }
+    else { target = Math.ceil((cur + 1) / step) * step; from = target - step; label = "Next milestone"; }
+    const pct = Math.max(0, Math.min(100, ((cur - from) / (target - from)) * 100));
+    return '<button class="hgoal" data-go="goals" aria-label="' + label + " " + fmt(target) + ", " + Math.floor(pct) + '% there. Open goals"><span class="row"><span>' + label + " · <b>" + fmt(target) + "</b></span><span><b>" + fmt(target - cur) + "</b> to go</span></span>" +
+      '<span class="meter ' + (kind === "club" ? "teal" : "hot") + '"><i style="width:' + pct.toFixed(1) + '%"></i></span></button>';
+  }
   function sinceNote(c) { return c && c.partial ? '<div class="sub mt">Tracking started ' + esc(dtShort(D.firstTs)) + ". Longer ranges fill in over time.</div>" : ""; }
   const rateTile = (label, series, key) => {
     const r = perDay(series, RANGES[key]);
-    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (r ? cls(r.rate) : "") + '">' + (r ? sgn(r.rate) : "—") + '</div><div class="n">' + (r ? (r.partial ? "/day so far" : "per day") : "needs data") + "</div></div>";
+    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (r ? cls(r.rate) : "na") + '">' + (r ? sgn(r.rate) : "—") + '</div><div class="n">' + (r ? (r.partial ? "/day so far" : "per day") : "needs data") + "</div></div>";
   };
   const changeTile = (label, series, key) => {
     const c = change(series, RANGES[key]);
-    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (c ? cls(c.delta) : "") + '">' + (c ? sgn(c.delta) : "—") + '</div><div class="n">' + (c && c.partial ? "since start" : "trophies") + "</div></div>";
+    return '<div class="tile"><div class="k">' + label + '</div><div class="v ' + (c ? cls(c.delta) : "na") + '">' + (c ? sgn(c.delta) : "—") + '</div><div class="n">' + (c && c.partial ? "since start" : "trophies") + "</div></div>";
   };
   const logRow = (b) => {
     const nm = b.br ? brName(b.br) : modeName(b.m);
@@ -478,7 +499,7 @@
       const start = list.length ? pts[0][1] - (list[0].tc || 0) : 0;
       drawChart(el, pts, {
         index: true, color: "var(--teal)", label: "Trophies after each battle", empty: "No battles in this range yet.",
-        xLabels: [list.length + (list.length === 1 ? " BATTLE" : " BATTLES") + " AGO", "LATEST"],
+        xLabels: [list.length + (list.length === 1 ? " battle" : " battles") + " ago", "Latest"],
         tip: (pt, i) => { const b = list[i]; return "<b>" + fmt(pt[1]) + "</b> · " + esc(sgn(pt[1] - start)) + " in range<br>" + esc(resLabel(b) + " · " + (b.br ? brName(b.br) : modeName(b.m)) + " · " + (b.tc == null ? "—" : sgn(b.tc))) + "<br>" + esc(dtShort(b.t)); },
       });
       return;
@@ -508,32 +529,38 @@
     const base = snapAt(D.ps, Date.now() - ms);
     const vg = (k) => (base && p[k] != null && base.p[k] != null ? p[k] - base.p[k] : null);
     const rows = clubRows(), mine = rows.findIndex((r) => r.tag === ME), myRole = mine >= 0 ? rows[mine].role : null;
-    const tile = (k, v, n, c) => '<div class="tile"><div class="k">' + k + '</div><div class="v ' + (c || "") + '">' + v + '</div><div class="n">' + n + "</div></div>";
+    const tile = (k, v, n, c) => '<div class="tile"><div class="k">' + k + '</div><div class="v ' + (v === "—" ? "na" : c || "") + '">' + v + '</div><div class="n">' + n + "</div></div>";
     const since = (t) => (Date.now() - t < DAY ? tShort(t) : dShort(t));
     const trophNote = !cr ? "no data" : cr.partial ? "since " + since(cr.from) : rr ? sgn(rr.rate, Math.abs(rr.rate) < 10 ? 1 : 0) + "/day" : "in " + RANGE_LABEL[rk];
     const inPts = D.pSeries.filter((pt) => inRange(pt[0], rk));
     const startV = rk === "all" ? (inPts[0] || [0, null])[1] : (valueAt(D.pSeries, Date.now() - ms) || inPts[0] || [0, null])[1];
     const endV = D.pSeries.length ? D.pSeries[D.pSeries.length - 1][1] : null;
+    // A player with nothing saved yet gets one friendly panel instead of a wall of zeros and dashes.
+    const fresh = !D.battles.length && D.pSeries.length < 3;
     const jumps = [["sec-overview", "Overview"], ["sec-battles", "Battles"], ["sec-modes", "Modes"], ["sec-log", "Log"], ["sec-career", "Career"]];
     return (
       '<div class="card cut" id="sec-overview">' +
         '<div class="hud-k k-label"><span>Trophies</span><span>' + esc(((D.C && D.C.c.name) || p.club || "") + (myRole ? " · " + (roleShort[myRole] || myRole) : "")) + "</span></div>" +
         '<div class="hero-num" data-k="me" data-v="' + p.trophies + '">' + fmt(p.trophies) + "</div>" +
-        '<div class="hud-sub"><span>Peak ' + fmt(p.highest) + "</span>" +
-          (p.trophies >= p.highest ? '<span class="up-t">At peak</span>' : "<span>" + fmt(p.highest - p.trophies) + " off peak</span>") +
-          (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
-          (c7 ? '<span class="' + tcls(c7.delta) + '">' + (c7.partial ? "Since " + esc(dShort(c7.from)) : "Δ7D") + " " + sgn(c7.delta) + "</span>" : "") +
+        '<div class="hchips">' +
+          (c24 ? dChip(c24.delta, "in 24h") : "") +
+          (c7 ? dChip(c7.delta, c7.partial ? "since " + esc(dShort(c7.from)) : "in 7 days") : "") +
+          (p.trophies >= p.highest ? '<span class="chip up">At peak</span>' : '<span class="chip">Peak <span class="num">' + fmt(p.highest) + "</span> · " + fmt(p.highest - p.trophies) + " below</span>") +
         "</div>" +
+        heroGoal("player", p.trophies, 2500) +
       "</div>" +
       '<div class="jump" role="navigation" aria-label="Jump to section">' + jumps.map(([id, l]) => '<button data-jump="' + id + '">' + l + "</button>").join("") + "</div>" +
-      '<div class="tiles glance">' +
+      (fresh
+        ? '<div class="card fresh">' + ghost() + "<p>Trends, win rate and streaks start once a few readings and battles are saved. The app reads " + esc(p.name || "this player") + "'s stats every 15 minutes, so check back soon.</p></div>" +
+          '<div class="tiles two">' + tile("Elo", fmt(p.elo), esc(p.rankName || "Unranked")) + tile("Club", mine >= 0 ? "#" + (mine + 1) : "—", "of " + (rows.length || "—")) + "</div>"
+        : '<div class="tiles glance">' +
         tile("Trophies", cr ? sgn(cr.delta) : "—", esc(trophNote), cr ? cls(cr.delta) : "") +
         tile("Win rate", st.rate == null ? "—" : pct100(st.rate) + "%", st.w + "W " + st.l + "L" + (st.d ? " " + st.d + "D" : "")) +
         tile("Per battle", st.perBattle == null ? "—" : sgn(st.perBattle, 1), st.n + (st.n === 1 ? " battle" : " battles"), cls(st.perBattle)) +
         tile("Streak", sk.v, sk.n, sk.c) +
         tile("Elo", fmt(p.elo), esc(p.rankName || "Unranked")) +
         tile("Club", mine >= 0 ? "#" + (mine + 1) : "—", "of " + (rows.length || "—")) +
-      "</div>" +
+      "</div>") +
       '<div class="card" id="sec-trend"><h2>Trophy trace</h2>' +
         '<div class="ctrls">' + seg("chart", S.chartMode, [["time", "By time"], ["battle", "By battle"]]) +
           (startV != null && endV != null ? '<span class="hud-sub"><span>' + fmt(startV) + " → " + fmt(endV) + '</span><span class="' + tcls(endV - startV) + '">' + sgn(endV - startV) + "</span></span>" : "") +
@@ -544,7 +571,7 @@
       battlesSection() +
       '<div class="sec-label" id="sec-career">Career</div>' +
       '<div class="card"><h2>Ranked<span class="sp"></span>' + (eloC ? '<span class="aside ' + tcls(eloC.delta) + '">' + sgn(eloC.delta) + " Elo · " + RANGE_LABEL[rk] + "</span>" : "") + "</h2>" +
-        '<div class="rankrow">' + (p.rank ? '<img class="rankart" src="' + esc(ART.rank(p.rank)) + '" alt="" loading="lazy">' : "") + '<div><div style="font-weight:700;font-size:22px;letter-spacing:1px;text-transform:uppercase">' + esc(p.rankName || "Unranked") + '</div><div class="sub num">' + fmt(p.elo) + " Elo</div></div></div>" +
+        '<div class="rankrow">' + (p.rank ? '<img class="rankart" src="' + esc(ART.rank(p.rank)) + '" alt="" loading="lazy">' : "") + '<div><div style="font-weight:700;font-size:22px">' + esc(p.rankName || "Unranked") + '</div><div class="sub num">' + fmt(p.elo) + " Elo</div></div></div>" +
         '<div class="tiles two mt"><div class="tile"><div class="k">Season best</div><div class="v">' + fmt(p.seasonBestElo) + '</div></div><div class="tile"><div class="k">All-time best</div><div class="v">' + fmt(p.bestElo) + '</div><div class="n">' + esc(p.bestRankName || "") + "</div></div></div>" +
       "</div>" +
       '<div class="card"><h2>Victories<span class="sp"></span><span class="aside">gained · ' + RANGE_LABEL[rk] + "</span></h2>" +
@@ -701,8 +728,9 @@
       '<div class="card cut">' +
         '<div class="hud-k k-label"><span>' + esc(c.name) + " // #" + esc(c.tag) + "</span><span>" + c.members.length + "/30</span></div>" +
         '<div class="hero-num teal" data-k="club" data-v="' + c.trophies + '">' + fmt(c.trophies) + "</div>" +
-        '<div class="hud-sub">' + (c24 ? '<span class="' + tcls(c24.delta) + '">Δ24H ' + sgn(c24.delta) + "</span>" : "") +
-          "<span>" + esc(c.type || "") + "</span><span>" + fmt(c.req) + "+ to join</span></div>" +
+        '<div class="hchips">' + (c24 ? dChip(c24.delta, "in 24h") : "") +
+          (c.type ? '<span class="chip">' + esc(title(c.type)) + "</span>" : "") + '<span class="chip"><span class="num">' + fmt(c.req) + "</span>+ to join</span></div>" +
+        heroGoal("club", c.trophies, 25000) +
         (c.desc ? '<div class="sub mt">' + esc(c.desc) + "</div>" : "") +
         (fr
           ? '<div class="asof' + (fr.lag ? " lag" : "") + '"><i></i><div><b>Checked ' + esc(ago(fr.checked)) + "</b>" +
@@ -726,8 +754,8 @@
         '<div class="ctrls">' + seg("memSort", S.memSort, [["trophies", "Trophies"], ["gain", "Gains"]]) + rangeSeg("members", ["24h", "7d", "30d"]) + "</div>" +
         '<div class="list">' +
           sorted.map((r, i) => {
-            const inactive = canInactive && r.g === 0;
-            return '<div class="li"><span class="rank">' + (i + 1) + '</span><span class="mono sm">' + art(ART.icon(r.icon)) + esc(initials(r.name)) + '</span><div class="main"><div class="t1">' + esc(r.name) + (r.tag === ME ? '<span class="you">YOU</span>' : "") +
+            const inactive = canInactive && r.g === 0, medal = i < 3 && (S.memSort !== "gain" || r.g > 0);
+            return '<div class="li' + (medal && !i ? " top1" : "") + '"><span class="rank' + (medal ? " medal m" + (i + 1) : "") + '">' + (i + 1) + '</span><span class="mono sm">' + art(ART.icon(r.icon)) + esc(initials(r.name)) + '</span><div class="main"><div class="t1">' + esc(r.name) + (r.tag === ME ? '<span class="you">You</span>' : "") +
               (r.role && r.role !== "member" ? '<span class="role ' + esc(r.role) + '">' + esc(roleName[r.role] || r.role) + "</span>" : "") + "</div>" +
               '<div class="t2 num">' + (String(r.tag).startsWith("~") ? "Tag pending" : "#" + esc(r.tag)) + (inactive ? " · no change " + RANGE_LABEL[S.r.members] : "") + "</div></div>" +
               '<div class="end"><div class="big">' + fmt(r.tr) + "</div>" +
@@ -810,7 +838,7 @@
     return lock + form + (cards.length ? cards.join("") : '<div class="card"><div class="chart-empty">No goals yet. Pick a target above and the app will track progress and estimate when you\'ll get there.</div></div>') + pushCard(locked) + linkCard();
   }
 
-  function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + esc(msg) + "</div></div>"; }
+  function emptyState(msg) { return '<div class="card"><div class="chart-empty">' + ghost() + "<span>" + esc(msg) + "</span></div></div>"; }
 
   // ---------- tablet layout ----------
   // On iPad-sized screens and wider, each tab's panels are split into two columns. Phones keep one column.
@@ -865,14 +893,15 @@
     const groups = cols.length ? [...cols].map((c) => [...c.children]) : [[...sec.children]];
     for (const items of groups) items.forEach((el, i) => { el.classList.add("enter-item"); el.style.animationDelay = Math.min(i, 8) * 45 + "ms"; });
   }
-  // Big numbers count up to their new value (with a short glow) when fresh data changes them.
+  // Big numbers count up from zero the first time they're shown, and to their new value (with a short glow) when fresh data changes them.
   const counts = {}, running = {};
   function countUps(root) {
     for (const el of root.querySelectorAll("[data-k]")) {
       const k = el.dataset.k, v = +el.dataset.v, prev = counts[k];
       counts[k] = v;
       if (prev != null && prev !== v && !REDUCED()) running[k] = { from: prev, to: v, t0: performance.now() };
-      if (running[k]) { el.classList.add("bump"); el.textContent = fmt(running[k].from); }
+      else if (prev == null && v > 0 && !REDUCED()) running[k] = { from: 0, to: v, t0: performance.now(), first: true };
+      if (running[k]) { if (!running[k].first) el.classList.add("bump"); el.textContent = fmt(running[k].from); }
     }
     if (Object.keys(running).length && !countUps.raf) countUps.raf = requestAnimationFrame(stepCounts);
   }
@@ -884,6 +913,23 @@
       if (p >= 1) delete running[k];
     }
     if (Object.keys(running).length) countUps.raf = requestAnimationFrame(stepCounts);
+  }
+
+  // Segmented controls are rebuilt on every render, so each remembers where its choice was and the thumb slides from there.
+  const thumbs = {};
+  function slideThumbs(root) {
+    if (!root || !root.querySelectorAll) return;
+    for (const g of root.querySelectorAll(".seg, .rangebar, .days")) {
+      const on = g.querySelector('button[aria-pressed="true"]'), b0 = g.querySelector("button");
+      if (!on || !g.offsetWidth) { g.classList.remove("thumbed"); continue; }
+      const key = g.className + ":" + (b0.dataset.seg || Object.keys(b0.dataset).join(",")) + ":" + g.children.length;
+      const pos = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight }, prev = thumbs[key];
+      const put = (q) => { g.style.setProperty("--tx", q.x + "px"); g.style.setProperty("--ty", q.y + "px"); g.style.setProperty("--tw", q.w + "px"); g.style.setProperty("--th", q.h + "px"); };
+      thumbs[key] = pos;
+      g.classList.add("thumbed");
+      if (prev && !REDUCED() && (prev.x !== pos.x || prev.y !== pos.y)) { g.classList.add("still"); put(prev); void g.offsetWidth; g.classList.remove("still"); }
+      put(pos);
+    }
   }
 
   // ---------- activity ----------
@@ -1008,7 +1054,7 @@
             '<div class="sub">' + (isOn ? "Likely playing: last battle " + esc(ago(A.lastEnd(m.tag))) + "." : A.lastEnd(m.tag) ? "Last battle " + esc(ago(A.lastEnd(m.tag))) + "." : "") + " Estimated this week: " + esc(dur(playIn(A.by.get(m.tag), now - 7 * DAY, now).ms)) + " across " + playIn(A.by.get(m.tag), now - 7 * DAY, now).k + " sessions.</div></div>"
         : "";
       return '<button class="arow" data-act-m="' + esc(m.tag) + '" aria-expanded="' + open + '">' + avatar(m) +
-        '<span class="nm">' + (isOn ? '<span class="pulse"></span>' : "") + "<b>" + esc(m.name) + "</b>" + (m.tag === ME ? '<span class="you">YOU</span>' : "") + "</span>" +
+        '<span class="nm">' + (isOn ? '<span class="pulse"></span>' : "") + "<b>" + esc(m.name) + "</b>" + (m.tag === ME ? '<span class="you">You</span>' : "") + "</span>" +
         '<span class="tot">' + esc(dur(p.ms)) + "<small>" + p.n + (p.n === 1 ? " battle" : " battles") + "</small></span>" +
         '<span class="track' + (S.drawAnim ? " grow" : "") + '">' + blocks + (nowPct != null ? '<i class="now" style="left:' + nowPct.toFixed(2) + '%"></i>' : "") + "</span></button>" + detail;
     };
@@ -1037,7 +1083,7 @@
     const maxW = Math.max(1, ...week.map((r) => r.p.ms));
     const leaders =
       '<div class="card" id="act-leaders"><h2>Most active · 7D</h2>' +
-        (week.length ? '<div class="list">' + week.slice(0, 10).map((r) => '<div class="barrow">' + avatar(r.m) + '<div style="min-width:0"><div class="nm">' + esc(r.m.name) + (r.m.tag === ME ? '<span class="you">YOU</span>' : "") + '</div><div class="bar"><i style="width:' + ((r.p.ms / maxW) * 100).toFixed(1) + '%"></i></div></div>' +
+        (week.length ? '<div class="list">' + week.slice(0, 10).map((r) => '<div class="barrow">' + avatar(r.m) + '<div style="min-width:0"><div class="nm">' + esc(r.m.name) + (r.m.tag === ME ? '<span class="you">You</span>' : "") + '</div><div class="bar"><i style="width:' + ((r.p.ms / maxW) * 100).toFixed(1) + '%"></i></div></div>' +
             '<div class="end">' + esc(dur(r.p.ms)) + "<small>" + r.p.n + " battles</small></div></div>").join("") + "</div>"
           : '<div class="sub">No sessions in the last 7 days yet.</div>') +
         (week.length && A.first && A.first > now - 7 * DAY ? '<div class="sub mt">Before ' + esc(dtShort(A.first)) + ", only each member's last 25 battles are counted.</div>" : "") +
@@ -1310,7 +1356,7 @@
     $("#hName").textContent = (P && P.p.name) || (S.profile && S.profile.name) || "#" + ME;
     const av = $("#hAvatar"), iconId = P && P.p.icon;
     if (av && iconId && av.dataset.icon !== String(iconId)) { av.innerHTML = art(ART.icon(iconId)) + esc(initials(P.p.name || "B")); av.dataset.icon = iconId; av.hidden = false; }
-    $("#hSub").textContent = "Player // #" + ME;
+    $("#hSub").textContent = "#" + ME + (C && C.c.name ? " · " + C.c.name : "");
     const btn = $("#refreshBtn");
     btn.classList.toggle("busy", S.live.busy);
     btn.classList.toggle("stale", !S.live.busy && (!D.lastTs || Date.now() - D.lastTs > 2 * HOUR));
@@ -1338,6 +1384,7 @@
     flushCharts();
     S.drawAnim = false;
     countUps(sec);
+    slideThumbs(document.querySelector(".wrap"));
     if (render.warmVer !== S.ver) { render.warmVer = S.ver; setTimeout(warmArt, 1500); }
     for (const b of document.querySelectorAll(".tabbar button")) { if (b.dataset.go === S.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
     if (active === "brSearch") { const el = $("#brSearch"); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) {} } }
@@ -2158,6 +2205,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     bar.innerHTML = r.v === "home" ? "" : '<button class="xp-back" data-xback aria-label="Back">' + xsvg("back") + '</button><span class="xp-crumb">' + crumb + "</span>";
     bar.hidden = r.v === "home";
     body.innerHTML = r.v === "player" ? xPlayer(r.tag) : r.v === "club" ? xClub(r.tag) : r.v === "vs" ? xVs(r) : xHome();
+    slideThumbs(body);
   }
   const xLoading = (label) => '<div class="xskel" role="status" aria-label="' + esc(label) + '"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div></div>';
   const xErrBox = (e, kind, tag) => '<div class="xerr" role="alert"><b>' + esc(e.t) + "</b><p>" + esc(e.d) + '</p><button class="btn ghost" data-xretry="' + kind + ":" + esc(tag) + '">Try again</button></div>';
@@ -2436,7 +2484,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
       : X.sort === "name" ? m.slice().sort((a, b) => String(a[1]).localeCompare(String(b[1]))) : top;
     const roster = '<div class="card"><h2>Roster<span class="sp"></span><span class="aside">' + m.length + "</span></h2>" +
       '<div class="ctrls"><div class="seg" role="group" aria-label="Sort members">' + [["trophies", "Trophies"], ["role", "Role"], ["name", "Name"]].map(([v, l]) => '<button data-xsort="' + v + '" aria-pressed="' + (X.sort === v) + '">' + l + "</button>").join("") + "</div></div>" +
-      "<div>" + sorted.map((x) => '<button class="xmem" data-xgo="p:' + esc(x[0]) + '" aria-label="' + esc(x[1]) + ", " + esc(roleName[x[2]] || "member") + ", " + fmt(x[3]) + ' trophies. Open profile"><span class="rank">' + (top.indexOf(x) + 1) + '</span><span class="mono">' + art(ART.icon(x[4])) + esc(initials(x[1])) + "</span>" +
+      "<div>" + sorted.map((x) => '<button class="xmem" data-xgo="p:' + esc(x[0]) + '" aria-label="' + esc(x[1]) + ", " + esc(roleName[x[2]] || "member") + ", " + fmt(x[3]) + ' trophies. Open profile"><span class="rank' + (top.indexOf(x) < 3 ? " medal m" + (top.indexOf(x) + 1) : "") + '">' + (top.indexOf(x) + 1) + '</span><span class="mono">' + art(ART.icon(x[4])) + esc(initials(x[1])) + "</span>" +
         '<span style="min-width:0"><span class="nm">' + esc(x[1]) + "</span>" + (x[2] && x[2] !== "member" ? '<span class="role ' + esc(x[2]) + '">' + esc(roleShort[x[2]] || x[2]) + "</span>" : "") + '</span><span class="end"><b>' + fmt(x[3]) + "</b><small>" + (total ? (((x[3] || 0) / total) * 100).toFixed(1) + "%" : "") + "</small></span></button>").join("") + "</div></div>";
     const act = r.tracked_via
       ? '<div class="card xtrack"><h2>Club history</h2><p>A member of this club is tracked in the app, so its trophy history and who\'s been playing are saved.</p><button class="btn" data-xopenclub="' + esc(r.tracked_via) + '">Open club history</button></div>'
@@ -2625,7 +2673,7 @@ const HELLO = {"box": "-7 -152 351 169", "d": "M23.8 -60C24 -60.1 24.4 -60.3 25 
     ME = start;
     const card = PROFILES.list().find((p) => p.tag === ME) || {};
     $("#hName").textContent = card.name || "#" + ME;
-    $("#hSub").textContent = "Player // #" + ME;
+    $("#hSub").textContent = "#" + ME;
     if (xr) xShow(xr);
     S.ownerCode = null;
     setTimeout(claimOldCodes, 0);

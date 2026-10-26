@@ -1,6 +1,6 @@
 // Adversarial tests for goals, alerts, link codes and abuse limits, run against the real server code (fn_harness.js).
 // node fn_security.js ../standalone/supabase/functions/brawl/index.ts
-const { load } = require("./fn_harness");
+const { load, pushKeys } = require("./fn_harness");
 const crypto = require("crypto");
 const FILE = process.argv[2];
 let fails = 0, n = 0;
@@ -18,7 +18,7 @@ const TAG = "8YRJ090Q2";
   db.T.goals.push({ id: "g-legacy-1", tag: TAG, kind: "player", target: 50000, start: 47000, created_at: now, owner: null });
   db.T.goals.push({ id: "g-legacy-2", tag: TAG, kind: "club", target: 600000, start: 500000, created_at: now, owner: null });
   db.T.readings.push({ id: 1, tag: TAG, ts: now, nb: now, trophies: 47408, club_trophies: 517000, player: { trophies: 47408 } });
-  db.T.push_subs.push({ endpoint: "https://push.test/legacy", p256dh: "k", auth: "a", tag: TAG, prefs: { goals: true }, owner: null });
+  db.T.push_subs.push({ endpoint: "https://fcm.googleapis.com/fcm/send/legacy", ...pushKeys(), tag: TAG, prefs: { goals: true }, owner: null });
 
   const A = dev(), B = dev(), C = dev(), D = dev();
   // --- goals are private to a device ---
@@ -38,7 +38,7 @@ const TAG = "8YRJ090Q2";
 
   // --- old per-player codes: one-time move to a device, with guess limits ---
   ok("claim with a wrong code is refused", (await call({ action: "claim_legacy", tag: TAG, device: C, code: "NOPE" }, "198.51.100.7")).status === 403);
-  const cl = await call({ action: "claim_legacy", tag: TAG, device: C, code: "oldcode", endpoint: "https://push.test/legacy" }, "198.51.100.7");
+  const cl = await call({ action: "claim_legacy", tag: TAG, device: C, code: "oldcode", endpoint: "https://fcm.googleapis.com/fcm/send/legacy" }, "198.51.100.7");
   ok("claim with the right code moves both old goals to C", cl.ok && cl.goals === 2, cl);
   ok("C now sees them, A doesn't", (await call({ action: "goals_list", tag: TAG, device: C })).goals.length === 2 && (await call({ action: "goals_list", tag: TAG, device: A })).goals.length === 1);
   ok("C's old push subscription now belongs to C", db.T.push_subs[0].owner && db.T.push_subs[0].owner === db.T.device_keys.find((k) => k.key_hash === sha("device:" + C)).owner);
@@ -69,16 +69,16 @@ const TAG = "8YRJ090Q2";
   ok("guessing link codes is cut off after 10 tries per address", last.status === 429, last);
 
   // --- goal alerts only reach the goal's owner ---
-  await call({ action: "push_subscribe", tag: TAG, device: B, sub: { endpoint: "https://push.test/B", keys: { p256dh: "k", auth: "a" } }, prefs: {} });
-  await call({ action: "push_subscribe", tag: TAG, device: A, sub: { endpoint: "https://push.test/A", keys: { p256dh: "k", auth: "a" } }, prefs: {} });
+  await call({ action: "push_subscribe", tag: TAG, device: B, sub: { endpoint: "https://fcm.googleapis.com/fcm/send/B", keys: { ...pushKeys() } }, prefs: {} });
+  await call({ action: "push_subscribe", tag: TAG, device: A, sub: { endpoint: "https://fcm.googleapis.com/fcm/send/A", keys: { ...pushKeys() } }, prefs: {} });
   const prof = db.T.profiles[0];
   await internals.checkEvents(prof, { trophies: 47408, club: null, elo: null, brawlers: null, prevClub: null, newClub: null });
   sent.length = 0;
   await internals.checkEvents(prof, { trophies: 48100, club: null, elo: null, brawlers: null, prevClub: null, newClub: null });
   const goalSends = sent.filter((s) => s.payload.title.includes("Goal"));
-  ok("A's 48,000 goal alert goes to A's devices only (A and C's old device), not B", goalSends.length === 2 && goalSends.every((s) => s.endpoint !== "https://push.test/B"), goalSends.map((s) => s.endpoint));
+  ok("A's 48,000 goal alert goes to A's devices only (A and C's old device), not B", goalSends.length === 2 && goalSends.every((s) => s.endpoint !== "https://fcm.googleapis.com/fcm/send/B"), goalSends.map((s) => s.endpoint));
   ok("milestone alerts still go to everyone following the player", sent.filter((s) => s.payload.title.includes("48,000")).length === 3, sent.map((s) => s.payload.title));
-  ok("push_subscribe for an untracked player is refused", (await call({ action: "push_subscribe", tag: "Q2", device: A, sub: { endpoint: "https://push.test/x", keys: { p256dh: "k", auth: "a" } } })).status === 404);
+  ok("push_subscribe for an untracked player is refused", (await call({ action: "push_subscribe", tag: "Q2", device: A, sub: { endpoint: "https://fcm.googleapis.com/fcm/send/x", keys: { ...pushKeys() } } })).status === 404);
 
   // --- abuse limits on expensive calls ---
   let r;

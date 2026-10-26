@@ -687,9 +687,11 @@ function cleanSub(sub: any) {
   };
   const publicKey = bytes(p256dh), authKey = bytes(auth);
   if (!publicKey || publicKey.length !== 65 || publicKey.charCodeAt(0) !== 4 || !authKey || authKey.length !== 16) return null;
-  // Pass the parsed URL onwards so the request library cannot interpret the
-  // original string differently (for example, backslashes or whitespace).
-  return { endpoint: url.href, p256dh, auth };
+  // Only accept endpoints already in canonical form, so the request library cannot
+  // interpret the string differently (for example, backslashes or whitespace) and
+  // the stored endpoint still matches what the device sends to change or remove it.
+  if (url.href !== endpoint) return null;
+  return { endpoint, p256dh, auth };
 }
 
 async function sha256(text: string) {

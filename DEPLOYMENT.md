@@ -4,10 +4,10 @@ The frontend and the Supabase backend have separate deployment steps. Applying t
 
 ## Order
 
-1. Review this branch and finish browser verification at 1440x900, 390x844 and 320x740. See the checks below.
-2. Apply `supabase/migrations/20261021090000_redeem_device_link.sql` to the intended Supabase project. This adds the issuance and redemption functions; it does not migrate existing rows on installation. Both functions are callable only by `service_role` and run with the caller's privileges. They share a transaction lock so issuance resolves the current owner even during a merge.
+1. Review this branch. Browser checks at 1440x900, 390x844 and 320x740 passed against a local preview on 26 October 2026 (see AUDIT_FIX_STATUS.md). Repeat the checks below on the published site after step 4.
+2. Confirm the target project is `iuukdskmzjglpvtlwldw`, then apply `supabase/migrations/20261021090000_redeem_device_link.sql` as a migration. Do not run `supabase/schema.sql`: it is a full reference, not a repeatable migration. This adds the issuance and redemption functions; it does not migrate existing rows on installation. Both functions are callable only by `service_role` and run with the caller's privileges. They share a transaction lock so issuance resolves the current owner even during a merge.
 3. Deploy the updated `supabase/functions/brawl/index.ts`. Preserve the project's existing `verify_jwt` setting and secrets. The inspected project used `verify_jwt=false` with application device-secret checks; this release does not change that authentication model. Link redemption intentionally fails closed if the RPC is missing.
-4. Merge/publish the frontend with **both** `index.html` and `app.js`, plus `sw.js`. Do not publish the extracted HTML alone. The new worker installs the complete shell and waits for old tabs to close. Bump `CACHE` in `sw.js` whenever a shell file changes.
+4. Merge/publish the frontend with **both** `index.html` and `app.js`, plus `sw.js`. Do not publish the extracted HTML alone. The new worker installs the complete shell and waits for old tabs to close. Bump `CACHE` in `sw.js` (currently `brawl-stats-v3`) whenever a shell file changes. The worker no longer revalidates shell files in the background, so a shell change without a new cache name never reaches installed clients.
 5. Verify ordinary lookups, tracked-history navigation, and device linking with controlled test devices. Confirm anonymous/authenticated roles cannot execute either link RPC and confirm the existing private-table RLS remains in place. Do not use real users' link codes for concurrency testing.
 
 Keep the old Edge Function source for rollback. Reverting the Edge Function reintroduces the old linking race; prefer disabling the link UI/action temporarily if a rollback is necessary. The additive RPCs can remain in the database while investigating.
@@ -33,7 +33,9 @@ X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
 ```
 
-The header CSP adds framing protection alongside the resource policy in the HTML. Confirm it on the final public HTML response. A hosting move or custom-domain proxy is a separate deployment decision; this branch does not perform one. [MDN: frame-ancestors and meta limitations](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors).
+The header CSP adds framing protection alongside the resource policy in the HTML. Confirm it on the final public HTML response. A hosting move or custom-domain proxy is a separate deployment decision; this branch does not perform one.
+
+Proposed option (needs approval before any DNS or hosting change): put a custom domain in front of the site with Cloudflare (free plan). Proxy it to GitHub Pages and add the four headers above with a Response Header Transform Rule. Pages keeps building from this repository, so the deploy flow stays the same. Then update `vapid().subject` and any links that use the github.io address. Another option is to move the static files to Cloudflare Pages or Netlify, with a `_headers` file in the repository. That changes where releases are published. In both cases the github.io address stays frameable unless it redirects to the new domain. [MDN: frame-ancestors and meta limitations](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors).
 
 ## Latency and diagnostics
 
@@ -41,7 +43,14 @@ Explore still applies its rate limit before expensive work. Cache lookup and tra
 
 Read-only Supabase profiling on 21 October 2026 found the database in Tokyo and invocations in other regions. Across the inspected 24-hour API logs, average origin times were about 422ms for rate calls, 319ms for usage counts, 163ms for cache calls and 176ms for profile calls. Database statement means were approximately 7.3ms, 2.1ms, 2.1ms and 0.8ms respectively. These aggregates cover different actions and are evidence of request overhead, not a measured before/after speedup for this release.
 
-No production speedup is claimed until the updated function is deployed and measured. Region pinning has not been enabled: compare representative clients before trading automatic regional failover for a forced location. [Supabase regional invocation](https://supabase.com/docs/guides/functions/regional-invocation), [background tasks](https://supabase.com/docs/guides/functions/background-tasks).
+No production speedup is claimed until the updated function is deployed and measured. As of 26 October 2026, production had recorded no Explore lookups since 21 October (28 in total, 3 of them cache hits), so the logs do not provide a baseline.
+
+After deployment, measure from a client:
+1. Run about 20 fresh requests: `explore_player` for distinct valid tags that have not been looked up in the last 2 minutes. Each one shows `lookup` including an upstream fetch.
+2. Run about 20 cached requests: repeat one tag within 2 minutes. The response has `source` = cache.
+3. For each request, record the client's total time and the `Server-Timing` stages `rate`, `lookup`, `profile` and `app`.
+4. Network overhead is the client total minus `app`. Server work is `app`. Report the median and p90 for each group, with sample counts.
+5. Compare against the same procedure run on the old function only if a baseline was captured before deployment. Region pinning has not been enabled: compare representative clients before trading automatic regional failover for a forced location. [Supabase regional invocation](https://supabase.com/docs/guides/functions/regional-invocation), [background tasks](https://supabase.com/docs/guides/functions/background-tasks).
 
 ## Tests
 

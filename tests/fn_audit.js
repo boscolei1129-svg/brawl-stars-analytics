@@ -69,6 +69,13 @@ const check = (label, condition) => { assert.ok(condition, label); console.log('
     const r = await call({ action: 'push_subscribe', tag, device: a, sub: { endpoint: 'https://' + host + '/test-token', keys } });
     check('accept supported provider ' + host, r.ok);
   }
+  for (const endpoint of ['https://FCM.googleapis.com/x', 'https://fcm.googleapis.com/a\\b', ' https://fcm.googleapis.com/x', 'https://fcm.googleapis.com/a b']) {
+    check('reject non-canonical endpoint ' + JSON.stringify(endpoint), !(await call({ action: 'push_subscribe', tag, device: a, sub: { endpoint, keys } })).ok);
+  }
+  const wns = 'https://wns2-par02p.notify.windows.com/w/?token=BQYAAAB%2bAbC%3d';
+  check('accept canonical endpoint with query', (await call({ action: 'push_subscribe', tag, device: a, sub: { endpoint: wns, keys } })).ok);
+  await call({ action: 'push_unsubscribe', tag, endpoint: wns });
+  check('stored endpoint matches the device\'s unsubscribe request', !db.T.push_subs.some(s => s.endpoint === wns));
   for (const invalid of [{ ...keys, p256dh: 'bad' }, { ...keys, auth: 'bad' }, { ...keys, p256dh: Buffer.alloc(65).toString('base64url') }]) {
     check('reject malformed subscription key', !(await call({ action: 'push_subscribe', tag, device: a, sub: { endpoint: 'https://fcm.googleapis.com/token', keys: invalid } })).ok);
   }

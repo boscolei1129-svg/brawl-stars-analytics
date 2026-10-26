@@ -3,7 +3,7 @@
 // after the app's existing tabs close, so old HTML never receives a new app.js. Game pictures (brawlers, profile icons,
 // modes, maps) are kept on the device after their first download. Stats requests to Supabase are never
 // touched here; the page keeps its own saved copy of those.
-const CACHE = "brawl-stats-v2";
+const CACHE = "brawl-stats-v3";
 const ART_CACHE = "brawl-art-v1";
 const ART_HOSTS = ["cdn.brawlify.com", "media.brawltime.ninja"];
 const ART_MAX = 800;
